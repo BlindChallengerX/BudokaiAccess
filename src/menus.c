@@ -28,16 +28,18 @@ typedef struct {
     int count;
     const char *items[12];
     int last;                /* last cursor spoken, -1 when closed */
+    int extra;               /* rows the port adds below the game's own (port 1.5: HUB, ONLINE), read by imgui.c */
+    int on_extra;            /* the cursor is on one of them */
 } Menu;
 
 static Menu k_menus[] = {
     /* Main menu: the mode under the cursor (Goku's comment on each is muted, see menus_poll).
      * Dragon Arena is the 7th item once unlocked. */
-    { "# MAIN MENU #", NULL, 0, 0x96, 1, 7, { "Dragon Universe", "Dueling", "World Tournament", "Practice", "Skill Editing", "Options", "Dragon Arena" }, -1 },
+    { "# MAIN MENU #", NULL, 0, 0x96, 1, 7, { "Dragon Universe", "Dueling", "World Tournament", "Practice", "Skill Editing", "Options", "Dragon Arena" }, -1, 1 },
     /* Character select, after choosing a fighter. */
     { "# CHARASEL #", NULL, 0, 0, 1, 3, { "Normal", "Custom", "Edit Skills" }, -1 },
     /* Dueling: who plays. */
-    { "# VS MODE #", "VS CHARASEL", 0, 0x53, 1, 4, { "1 P versus computer", "1 P versus 2 P", "Computer versus 2 P", "Computer versus computer" }, -1 },
+    { "# VS MODE #", "VS CHARASEL", 0, 0x53, 1, 4, { "1 P versus computer", "1 P versus 2 P", "Computer versus 2 P", "Computer versus computer" }, -1, 1 },
     /* Dragon Arena: who fights. */
     { "# ARENA MODE #", "# ARENA CHARASE", 0, 0x35, 1, 3, { "1 P versus computer", "1 P versus 2 P", "Computer versus computer" }, -1 },
     /* Dragon Universe title menu. */
@@ -58,6 +60,7 @@ static void say_item(const Menu *m, int c, int interrupt) {
     /* Main menu: Dragon Arena only once its ticket (capsule 516) is unlocked
      * (unlock flags at G+0x2afe9 + capsule, as for the Bonus items). */
     if (!strcmp(m->task, "# MAIN MENU #") && c < 6 && !g8(LIVE_G_EARLY + 0x2afe9 + 516)) n = 6;
+    if (im_ready()) n += m->extra;
     speakf(interrupt, "%s, %d of %d", m->items[c], c + 1, n);
 }
 
@@ -786,10 +789,17 @@ void menus_poll(void) {
     for (int i = 0; i < NMENUS; i++) {
         Menu *m = &k_menus[i];
         uint32_t w = menu_base(m);
-        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) { m->last = -1; continue; }
+        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) { m->last = -1; m->on_extra = 0; continue; }
         int c = m->size == 4 ? (int)g32(w + m->cursor_off) : g8(w + m->cursor_off);
+        /* On a port row the game's cursor stays where it was; imgui.c reads the row.
+         * Coming back from it, say the game's item again. */
+        if (m->extra) {
+            int on = im_row_on();
+            if (on) { m->on_extra = 1; continue; }
+            if (m->on_extra) { m->on_extra = 0; m->last = -2; }
+        }
         if (c < 0 || c >= m->count || c == m->last) continue;
-        say_item(m, c, m->last >= 0);
+        say_item(m, c, m->last != -1);
         m->last = c;
     }
     shop_poll(0);
@@ -813,6 +823,7 @@ void menus_poll(void) {
 
 /* F5: say the highlighted item of any open menu. */
 int menus_read_current(void) {
+    if (im_row_on()) return im_read_all(1);
     if (g_wish >= 0) return wish_say(1);
     if (g_stage_last >= 0) return stage_say(1);
     if (g_bonus_last >= 0) return bonus_say(1);

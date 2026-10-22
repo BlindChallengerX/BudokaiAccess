@@ -109,6 +109,23 @@ void text_mute_pack2(uint32_t sum);
 void text_mute_list(uint32_t sum);
 int sysq_open(void);           /* menus.c: a save or storage Yes/No question is up */
 
+/* imgui.c: text of the port's own ImGui screens (port 1.5 and later) */
+#define IM_MAX 384
+#define IM_TEXT 400
+typedef struct { char s[IM_TEXT]; float x, y, size; uint32_t col; void *list; } ImText;
+void im_init(void);
+void im_shutdown(void);
+int im_ready(void);
+int im_frame(ImText *out, int max, LONG *frame_no);
+void im_dump(void);
+void im_poll(void);
+void im_mute(int on);
+const char *im_row(void);
+int im_row_on(void);
+int im_any_text(void);
+const char *im_find(const char *prefix);
+int im_read_all(int interrupt);
+
 /* menus.c */
 void menus_poll(void);
 int menus_read_current(void);
