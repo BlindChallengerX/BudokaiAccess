@@ -187,6 +187,13 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
         l[nl].s = t->s; l[nl].list = t->list; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind; l[nl].off = off;
         nl++;
     }
+    /* Menu rows stand alone; a row-coloured line inside a block of lines is text. */
+    for (int k = 0; k < nl; k++) {
+        if (l[k].kind == K_TEXT) continue;
+        int lines = 0;
+        for (int j = 0; j < nl; j++) lines += l[j].para == l[k].para;
+        if (lines > 1) l[k].kind = K_TEXT;
+    }
     /* A row colour only makes a row when a highlighted row of that list and size is up
      * (the transform selector's "Ki to transform" line uses the row colour too). */
     for (int k = 0; k < nl; k++) {
@@ -212,6 +219,10 @@ static const struct { const char *start, *name; } k_rows[] = {
     { "Stories and missions from Budokai 2", "Gateway" },
     { "Needs your copy of Dragon Ball Z Budokai (PS2)", "Legend of Hercule, not available" },
     { "A hundred missions by saga", "Mission 100" },
+    /* Tag Team's first screen */
+    { "Your team against the computer's", "1 P versus computer" },
+    { "Two players, each picks a team", "1 P versus 2 P" },
+    { "Watch two teams of your choice", "Computer versus computer" },
 };
 
 /* Lines that come back over and over: the HUB's status line under every row
@@ -251,13 +262,21 @@ static int g_im_mute;
 static char g_last_row[64];
 static DWORD g_row_seen;           /* when a row description was last on screen */
 static char g_sel[IM_TEXT];        /* highlighted menu row last spoken, as drawn */
+#define NSEL 16
+static struct { char s[IM_TEXT]; void *list; float y; DWORD seen; } g_sels[NSEL];   /* highlighted rows on screen */
 static DWORD g_sel_said;
 
 /* Is the cursor on one of the port's rows (its description is up)? */
 int im_row_on(void) { return g_ready && GetTickCount() - g_row_seen < 100; }
+/* Was a port row or screen up in the last ms milliseconds? (screens fade between rows) */
+int im_port_recent(DWORD ms);
 /* Is one of the port's own menus up (a highlighted row on screen)? */
 static DWORD g_sel_seen;
 int im_menu_on(void) { return g_ready && GetTickCount() - g_sel_seen < 150; }
+int im_port_recent(DWORD ms) {
+    DWORD now = GetTickCount();
+    return g_ready && (now - g_sel_seen < ms || now - g_row_seen < ms);
+}
 
 void im_mute(int on) { g_im_mute = on; }
 const char *im_row(void) { return g_last_row; }
@@ -291,10 +310,11 @@ const char *im_find(const char *prefix) {
 static void say_para(const char *text) {
     const char *row = row_name(text);
     char buf[2048];
-    if (row && GetTickCount() - g_sel_said > 600) {
+    if (row && _stricmp(row, g_sel)) {                /* not when the row's own label was just read (ONLINE) */
         snprintf(g_last_row, sizeof g_last_row, "%s", row);
         snprintf(buf, sizeof buf, "%s. %s", row, text);
     } else snprintf(buf, sizeof buf, "%s", text);
+    for (char *c = buf; *c; c++) if (*c == '\n') *c = ' ';
     log_line("imgui say: %s", buf);
     speak_utf8(buf, 0);
 }
@@ -311,31 +331,45 @@ void im_poll(void) {
         seen_frame = fno;
         int nl = build_lines(f, n, l, IM_MAX);
         for (int k = 0; k < nl; k++) if (row_name(l[k].s)) g_row_seen = now;
-        /* The highlighted row: say it (and its place among the rows of its list) when it changes. */
-        int sel = -1, nrows = 0, pos = 0;
-        for (int k = 0; k < nl; k++) if (l[k].kind == K_ROW_SEL) { sel = k; break; }
-        if (sel >= 0) {
+        /* Highlighted rows (a screen can have more than one: Tag Team's team slot and form
+         * picker): say each one that changes, with its place among the rows of its list. */
+        int nsel = 0;
+        for (int k = 0; k < nl; k++) {
+            if (l[k].kind != K_ROW_SEL) continue;
+            nsel++;
             g_sel_seen = now;
-            for (int k = 0; k < nl; k++)
-                if (l[k].kind != K_TEXT && l[k].list == l[sel].list && l[k].size == l[sel].size) {
-                    nrows++;
-                    if (l[k].y < l[sel].y - 1) pos++;
-                }
-            if (strcmp(g_sel, l[sel].s)) {
-                snprintf(g_sel, sizeof g_sel, "%s", l[sel].s);
-                char say[IM_TEXT];
-                snprintf(say, sizeof say, "%s", g_sel);
-                char *dash = strstr(say, "- - -");             /* ONLINE's empty room code */
-                if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
-                g_sel_said = now;
-                if (!g_im_mute) {
-                    const char *off = l[sel].off ? ", unavailable" : "";
-                    if (nrows > 1) speakf(1, "%s%s, %d of %d", say, off, pos + 1, nrows);
-                    else speakf(1, "%s%s", say, off);
-                    log_line("imgui row: %s (%d of %d)", g_sel, pos + 1, nrows);
-                }
+            int known = 0;
+            for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
+            for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
+            if (known) continue;
+            /* replace the entry of the same spot, else the oldest */
+            int slot = 0;
+            for (int i = 0; i < NSEL; i++) {
+                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && g_sels[i].y > l[k].y - l[k].size * 0.5f && g_sels[i].y < l[k].y + l[k].size * 0.5f) { slot = i; break; }
+                if (g_sels[i].seen < g_sels[slot].seen) slot = i;
             }
-        } else if (g_sel[0] && now - g_sel_seen > 2000) g_sel[0] = 0;   /* a selector that hides while the game scrolls stays quiet */
+            snprintf(g_sels[slot].s, sizeof g_sels[slot].s, "%s", l[k].s);
+            g_sels[slot].list = l[k].list; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
+            snprintf(g_sel, sizeof g_sel, "%s", l[k].s);
+            g_sel_said = now;
+            int nrows = 1, pos = 0, others = 0;
+            for (int j = 0; j < nl; j++)
+                if (j != k && (l[j].kind == K_ROW || l[j].kind == K_ROW_OFF) && l[j].list == l[k].list && l[j].size == l[k].size) {
+                    nrows++; others++;
+                    if (l[j].y < l[k].y - 1) pos++;
+                }
+            char say[IM_TEXT];
+            snprintf(say, sizeof say, "%s", l[k].s);
+            char *dash = strstr(say, "- - -");             /* ONLINE's empty room code */
+            if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
+            if (g_im_mute) continue;
+            const char *off = l[k].off ? ", unavailable" : "";
+            if (others) speakf(nsel == 1, "%s%s, %d of %d", say, off, pos + 1, nrows);
+            else speakf(nsel == 1, "%s%s", say, off);
+            log_line("imgui row: %s (%d of %d)", l[k].s, pos + 1, nrows);
+        }
+        for (int i = 0; i < NSEL; i++)        /* a selector that hides while the game scrolls stays quiet */
+            if (g_sels[i].s[0] && now - g_sels[i].seen > 2000) g_sels[i].s[0] = 0;
         for (int k = 0; k < nl; k++) {
             int found = 0, freei = -1;
             for (int i = 0; i < IV; i++) {

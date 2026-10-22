@@ -250,17 +250,76 @@ static void pause_poll(void) {
  * Task "STAGE SELECT", work data: +0x244 the stages you can pick (16-bit
  * IDs, -1 after the last), +0x25d the stage under the cursor, +0x260 its
  * position in that list, +0x261 how many there are. Stage ID 0..11 is the
- * stage capsule 517 + ID (its name is in the capsule names); 12 is random. */
+ * stage capsule 517 + ID (its name is in the capsule names); 12 is random.
+ * Port 1.5 adds stages (Budokai 1/2 and Infinite World ones made from the
+ * player's discs): ID 13 + k is the k-th [[escenario]] of the enabled mods'
+ * stage.toml files (mods in folder order, ones with selector = false left
+ * out), named by its titulo (or nombre). */
 #define STAGE_CAPSULE0 517
 static int g_stage_last = -1;
+static char g_new_stages[48][64];
+static int g_nnew_stages = -1;
+
+static void stage_value(char *line, char *out, size_t cap) {
+    char *v = strchr(line, '=');
+    if (!v) { out[0] = 0; return; }
+    v++;
+    while (*v == ' ' || *v == '\t') v++;
+    if (*v == '"') { v++; char *e = strchr(v, '"'); if (e) *e = 0; }
+    else { char *e = strpbrk(v, "#\r\n"); if (e) *e = 0; }
+    snprintf(out, cap, "%s", v);
+    size_t n = strlen(out);
+    while (n && (out[n - 1] == ' ' || out[n - 1] == '\t')) out[--n] = 0;
+}
+
+static void load_new_stages(void) {
+    g_nnew_stages = 0;
+    wchar_t pat[MAX_PATH];
+    swprintf(pat, MAX_PATH, L"%lsmods\\*", g_game_dir);
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pat, &fd);           /* NTFS lists folders in name order, like the port */
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == L'.') continue;
+        wchar_t path[MAX_PATH];
+        swprintf(path, MAX_PATH, L"%lsmods\\%ls\\.disabled", g_game_dir, fd.cFileName);
+        if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) continue;
+        swprintf(path, MAX_PATH, L"%lsmods\\%ls\\stage.toml", g_game_dir, fd.cFileName);
+        FILE *f = _wfopen(path, L"r");
+        if (!f) continue;
+        char line[512], name[64] = "", title[64] = "";
+        int in = 0, shown = 1;
+        for (;;) {
+            int eof = !fgets(line, sizeof line, f);
+            char *t = line; while (*t == ' ' || *t == '\t') t++;
+            if (eof || *t == '[') {
+                if (in && shown && g_nnew_stages < 48) snprintf(g_new_stages[g_nnew_stages++], 64, "%s", title[0] ? title : name);
+                in = !eof && (!strncmp(t, "[[escenario]]", 13) || !strncmp(t, "[escenario]", 11));
+                name[0] = title[0] = 0; shown = 1;
+                if (eof) break;
+                continue;
+            }
+            if (!in) continue;
+            char v[64];
+            if (!strncmp(t, "titulo", 6)) stage_value(t, title, sizeof title);
+            else if (!strncmp(t, "nombre", 6)) stage_value(t, name, sizeof name);
+            else if (!strncmp(t, "selector", 8)) { stage_value(t, v, sizeof v); shown = strcmp(v, "false") && strcmp(v, "no") && strcmp(v, "0"); }
+        }
+        fclose(f);
+    } while (FindNextFileW(h, &fd));
+    FindClose(h);
+    log_line("stages added by mods: %d", g_nnew_stages);
+}
 
 static int stage_say(int interrupt) {
     uint32_t w = task_work("STAGE SELECT");
     if (!w || !guest_ok(w + 0x244, 0x20)) return 0;
     int id = g8(w + 0x25d), pos = g8(w + 0x260), n = g8(w + 0x261);
-    if (n < 1 || n > 13 || pos >= n) return 0;
-    speakf(interrupt, "%s, %d of %d", id == 12 ? "Random stage" : id < 12 ? capsule_name(STAGE_CAPSULE0 + id) : "Stage",
-           pos + 1, n);
+    if (n < 1 || n > 64 || pos >= n) return 0;
+    if (g_nnew_stages < 0) load_new_stages();
+    const char *name = id == 12 ? "Random stage" : id < 12 ? capsule_name(STAGE_CAPSULE0 + id)
+                     : id - 13 < g_nnew_stages && g_new_stages[id - 13][0] ? g_new_stages[id - 13] : "Stage";
+    speakf(interrupt, "%s, %d of %d", name, pos + 1, n);
     return 1;
 }
 
@@ -796,6 +855,7 @@ void menus_poll(void) {
         if (m->extra) {
             int on = im_row_on() || im_menu_on();      /* a port screen over the menu (ONLINE) too */
             if (on) { m->on_extra = 1; continue; }
+            if (m->on_extra && im_port_recent(350)) continue;    /* a port screen opening or fading */
             if (m->on_extra) { m->on_extra = 0; m->last = -2; }
         }
         if (c < 0 || c >= m->count || c == m->last) continue;
