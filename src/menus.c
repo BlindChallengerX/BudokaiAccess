@@ -794,7 +794,7 @@ void menus_poll(void) {
         /* On a port row the game's cursor stays where it was; imgui.c reads the row.
          * Coming back from it, say the game's item again. */
         if (m->extra) {
-            int on = im_row_on();
+            int on = im_row_on() || im_menu_on();      /* a port screen over the menu (ONLINE) too */
             if (on) { m->on_extra = 1; continue; }
             if (m->on_extra) { m->on_extra = 0; m->last = -2; }
         }
@@ -823,7 +823,7 @@ void menus_poll(void) {
 
 /* F5: say the highlighted item of any open menu. */
 int menus_read_current(void) {
-    if (im_row_on()) return im_read_all(1);
+    if (im_row_on() || im_menu_on()) return im_read_all(1);
     if (g_wish >= 0) return wish_say(1);
     if (g_stage_last >= 0) return stage_say(1);
     if (g_bonus_last >= 0) return bonus_say(1);

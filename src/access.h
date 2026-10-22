@@ -122,6 +122,7 @@ void im_poll(void);
 void im_mute(int on);
 const char *im_row(void);
 int im_row_on(void);
+int im_menu_on(void);
 int im_any_text(void);
 const char *im_find(const char *prefix);
 int im_read_all(int interrupt);

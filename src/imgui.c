@@ -17,10 +17,20 @@ typedef struct { float x, y; } ImVec2;
 typedef void (__cdecl *addtext_fn)(void *self, void *font, float size, const ImVec2 *pos, uint32_t col,
                                    const char *b, const char *e, float wrap, const void *clip);
 typedef void (__cdecl *newframe_fn)(void);
+typedef void (__cdecl *addrect_fn)(void *self, const ImVec2 *a, const ImVec2 *b, uint32_t col, float rounding, int flags, float thick);
 
 static addtext_fn o_addtext;
 static newframe_fn o_newframe;
-static void *g_addtext_target, *g_newframe_target;
+static addrect_fn o_addrect;
+static void *g_addtext_target, *g_newframe_target, *g_addrect_target;
+
+/* The port's highlighted row: style::Highlight frames the row's stripe with a
+ * thin turquoise rectangle, IM_COL32(165, 244, 230, 170). */
+#define HL_COL 0xaae6f4a5u
+typedef struct { void *list; float y0, y1; } HlRect;
+#define HL_MAX 8
+static HlRect g_hl_build[HL_MAX], g_hl_done[HL_MAX];
+static int g_nhl_build, g_nhl_done;
 
 /* Two frames: the one being drawn and the last finished one. */
 static ImText g_build[IM_MAX], g_done[IM_MAX];
@@ -46,11 +56,24 @@ static void __cdecl h_addtext(void *self, void *font, float size, const ImVec2 *
     InterlockedDecrement(&g_inflight);
 }
 
+static void __cdecl h_addrect(void *self, const ImVec2 *a, const ImVec2 *b, uint32_t col, float rounding, int flags, float thick) {
+    InterlockedIncrement(&g_inflight);
+    if (col == HL_COL && a && b && g_nhl_build < HL_MAX) {
+        HlRect *r = &g_hl_build[g_nhl_build++];
+        r->list = self; r->y0 = a->y; r->y1 = b->y;
+    }
+    o_addrect(self, a, b, col, rounding, flags, thick);
+    InterlockedDecrement(&g_inflight);
+}
+
 static void __cdecl h_newframe(void) {
     InterlockedIncrement(&g_inflight);
     EnterCriticalSection(&g_lock);
     memcpy(g_done, g_build, sizeof(ImText) * (size_t)g_nbuild);
     g_ndone = g_nbuild;
+    memcpy(g_hl_done, g_hl_build, sizeof(HlRect) * (size_t)g_nhl_build);
+    g_nhl_done = g_nhl_build;
+    g_nhl_build = 0;
     InterlockedIncrement(&g_frame_no);
     LeaveCriticalSection(&g_lock);
     g_nbuild = 0;
@@ -59,11 +82,16 @@ static void __cdecl h_newframe(void) {
 }
 
 /* Copies the last finished frame; returns how many texts (0 if none). */
+static HlRect g_hl[HL_MAX];
+static int g_nhl;
+
 int im_frame(ImText *out, int max, LONG *frame_no) {
     if (!g_ready) return 0;
     EnterCriticalSection(&g_lock);
     int n = g_ndone < max ? g_ndone : max;
     memcpy(out, g_done, sizeof(ImText) * (size_t)n);
+    memcpy(g_hl, g_hl_done, sizeof g_hl);
+    g_nhl = g_nhl_done;
     if (frame_no) *frame_no = g_frame_no;
     LeaveCriticalSection(&g_lock);
     return n;
@@ -76,6 +104,7 @@ void im_init(void) {
     if (!rt) { log_line("imgui: no rexruntime.dll"); return; }
     g_addtext_target = (void *)GetProcAddress(rt, "?AddText@ImDrawList@@QEAAXPEAUImFont@@MAEBUImVec2@@IPEBD2MPEBUImVec4@@@Z");
     g_newframe_target = (void *)GetProcAddress(rt, "?NewFrame@ImGui@@YAXXZ");
+    g_addrect_target = (void *)GetProcAddress(rt, "?AddRect@ImDrawList@@QEAAXAEBUImVec2@@0IMHM@Z");
     if (!g_addtext_target || !g_newframe_target) { log_line("imgui: exports not found (port too old?)"); return; }
     InitializeCriticalSection(&g_lock);
     if (MH_CreateHook(g_addtext_target, (void *)h_addtext, (void **)&o_addtext) != MH_OK ||
@@ -84,6 +113,8 @@ void im_init(void) {
     }
     MH_EnableHook(g_addtext_target);
     MH_EnableHook(g_newframe_target);
+    if (g_addrect_target && MH_CreateHook(g_addrect_target, (void *)h_addrect, (void **)&o_addrect) == MH_OK) MH_EnableHook(g_addrect_target);
+    else g_addrect_target = NULL;
     g_ready = 1;
     log_line("imgui: text hooks on");
 }
@@ -95,6 +126,7 @@ void im_shutdown(void) {
     MH_DisableHook(g_newframe_target);
     MH_RemoveHook(g_addtext_target);
     MH_RemoveHook(g_newframe_target);
+    if (g_addrect_target) { MH_DisableHook(g_addrect_target); MH_RemoveHook(g_addrect_target); }
 }
 
 /* imdump: log every text of the last frame with position and colour. */
@@ -117,7 +149,7 @@ void im_dump(void) {
  * spoken together, so a box whose last line stays (the HUB's "Rank: ...")
  * only says what changed. A spot on screen whose text keeps changing (a
  * timer, a counter) goes quiet for a while. */
-typedef struct { const char *s; void *list; float y, size; int para; int kind; } Line;
+typedef struct { const char *s; void *list; float y, size; int para; int kind; int off; } Line;
 
 /* Menu rows of the port's screens are drawn by its style::MenuText in fixed
  * colours (top half of the letters): the highlighted row, an ordinary row, a
@@ -137,15 +169,22 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
         ImText *t = &f[i];
         if (!strcmp(t->s, "Debug")) continue;          /* ImGui's implicit window */
         int kind = kind_of(t->col), dup = 0;
+        for (int i2 = 0; i2 < g_nhl && kind != K_TEXT; i2++)      /* in the highlight stripe */
+            if (g_hl[i2].list == t->list && t->y >= g_hl[i2].y0 - 2 && t->y <= g_hl[i2].y1) kind = K_ROW_SEL;
+        int off = t->col == 0xebac9e96u;
         for (int j = 0; j < nl && !dup; j++)
-            if (!strcmp(l[j].s, t->s)) { dup = 1; if (kind > l[j].kind) l[j].kind = kind; }
+            if (!strcmp(l[j].s, t->s)) {
+                dup = 1;
+                if (kind == K_ROW_SEL || (kind != K_TEXT && l[j].kind == K_TEXT)) l[j].kind = kind;
+                l[j].off |= off;
+            }
         if (dup) continue;
         Line *last = nl ? &l[nl - 1] : NULL;
         float gap = last ? t->y - last->y : 0;
         int joins = last && last->list == t->list && last->size == t->size && t->size > 0 &&
                     gap > t->size * 0.5f && gap < t->size * 1.9f;
         if (!joins) para++;
-        l[nl].s = t->s; l[nl].list = t->list; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind;
+        l[nl].s = t->s; l[nl].list = t->list; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind; l[nl].off = off;
         nl++;
     }
     /* A row colour only makes a row when a highlighted row of that list and size is up
@@ -211,11 +250,14 @@ static Slot g_slots[32];
 static int g_im_mute;
 static char g_last_row[64];
 static DWORD g_row_seen;           /* when a row description was last on screen */
-static char g_sel[IM_TEXT];        /* highlighted menu row last spoken */
-static DWORD g_sel_said, g_sel_seen;
+static char g_sel[IM_TEXT];        /* highlighted menu row last spoken, as drawn */
+static DWORD g_sel_said;
 
 /* Is the cursor on one of the port's rows (its description is up)? */
 int im_row_on(void) { return g_ready && GetTickCount() - g_row_seen < 100; }
+/* Is one of the port's own menus up (a highlighted row on screen)? */
+static DWORD g_sel_seen;
+int im_menu_on(void) { return g_ready && GetTickCount() - g_sel_seen < 150; }
 
 void im_mute(int on) { g_im_mute = on; }
 const char *im_row(void) { return g_last_row; }
@@ -281,10 +323,15 @@ void im_poll(void) {
                 }
             if (strcmp(g_sel, l[sel].s)) {
                 snprintf(g_sel, sizeof g_sel, "%s", l[sel].s);
+                char say[IM_TEXT];
+                snprintf(say, sizeof say, "%s", g_sel);
+                char *dash = strstr(say, "- - -");             /* ONLINE's empty room code */
+                if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
                 g_sel_said = now;
                 if (!g_im_mute) {
-                    if (nrows > 1) speakf(1, "%s, %d of %d", g_sel, pos + 1, nrows);
-                    else speak_utf8(g_sel, 1);
+                    const char *off = l[sel].off ? ", unavailable" : "";
+                    if (nrows > 1) speakf(1, "%s%s, %d of %d", say, off, pos + 1, nrows);
+                    else speakf(1, "%s%s", say, off);
                     log_line("imgui row: %s (%d of %d)", g_sel, pos + 1, nrows);
                 }
             }
