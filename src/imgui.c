@@ -350,19 +350,21 @@ void im_poll(void) {
         /* Highlighted rows (a screen can have more than one: Tag Team's team slot and form
          * picker): say each one that changes, with its place among the rows of its list. */
         int said = 0;
+        for (int k = 0; k < nl; k++)              /* first mark the ones still up, so two drawn at one spot keep each other */
+            if (l[k].kind == K_ROW_SEL)
+                for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
         for (int k = 0; k < nl; k++) {
             if (l[k].kind != K_ROW_SEL) continue;
             g_sel_seen = now;
             int known = 0;
             for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
-            for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
             if (known) continue;
             /* forget what was at the same spot (rows are centred: compare centres, text width
              * guessed from its length), then take a free or the oldest entry */
             float cx = l[k].x + (float)strlen(l[k].s) * l[k].size * 0.25f;
             int slot = 0;
             for (int i = 0; i < NSEL; i++) {
-                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && fabsf(g_sels[i].x - cx) < l[k].size * 2 &&
+                if (g_sels[i].s[0] && g_sels[i].seen != now && g_sels[i].list == l[k].list && fabsf(g_sels[i].x - cx) < l[k].size * 2 &&
                     g_sels[i].y > l[k].y - l[k].size * 0.5f && g_sels[i].y < l[k].y + l[k].size * 0.5f) g_sels[i].s[0] = 0;
                 if (!g_sels[i].s[0] ? g_sels[slot].s[0] != 0 : g_sels[i].seen < g_sels[slot].seen && g_sels[slot].s[0]) slot = i;
             }
