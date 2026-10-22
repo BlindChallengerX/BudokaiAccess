@@ -18,6 +18,7 @@ static volatile LONG g_pkt_bias;        /* added to the packet number so the gam
 static volatile int16_t g_inject_lx, g_inject_ly, g_inject_rx, g_inject_ry;
 static volatile uint8_t g_inject_lt, g_inject_rt;
 volatile uint16_t g_pad_buttons;        /* player 1 buttons in the last read (after injection) */
+volatile LONG g_pad_moves;              /* up/down presses so far (port screens read the pad themselves) */
 volatile uint8_t g_pad_lt, g_pad_rt;
 volatile int16_t g_pad_lx, g_pad_ly, g_pad_rx, g_pad_ry;
 
@@ -50,6 +51,7 @@ static void h_get_state(PPCContext *c, uint8_t *b) {
         if (g_inject_ry) *(uint16_t *)gptr(st + 14) = _byteswap_ushort((uint16_t)g_inject_ry);
     } else if (g_inject_on) { g_inject_on = 0; InterlockedIncrement(&g_pkt_bias); }
     if (g_pkt_bias) w32(st, g32(st) + (uint32_t)g_pkt_bias);
+    if ((btn & 3) && !(g_pad_buttons & 3)) InterlockedIncrement(&g_pad_moves);
     g_pad_buttons = btn;
     g_pad_lt = g8(st + 6); g_pad_rt = g8(st + 7);
     g_pad_lx = (int16_t)g16(st + 8); g_pad_ly = (int16_t)g16(st + 10);
@@ -90,6 +92,12 @@ static void *g_ui_state_target;
 static uint32_t h_ui_state(void *self, uint32_t user, void *state) {
     InterlockedIncrement(&g_inflight);
     uint32_t r = o_ui_state(self, user, state);
+    if (user == 0 && state && r == 0) {
+        static uint16_t prev;
+        uint16_t b = _byteswap_ushort(*(uint16_t *)((uint8_t *)state + 4));
+        if ((b & 3) && !(prev & 3)) InterlockedIncrement(&g_pad_moves);
+        prev = b;
+    }
     if (user == 0 && state && g_inject && GetTickCount() < g_inject_until) {
         if (r != 0) { memset(state, 0, 16); r = 0; }    /* testing with no pad plugged in */
         *(uint16_t *)((uint8_t *)state + 4) |= _byteswap_ushort(g_inject);

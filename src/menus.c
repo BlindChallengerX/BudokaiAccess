@@ -30,6 +30,7 @@ typedef struct {
     int last;                /* last cursor spoken, -1 when closed */
     int extra;               /* rows the port adds below the game's own (port 1.5: HUB, ONLINE), read by imgui.c */
     int on_extra;            /* the cursor is on one of them */
+    LONG moves;              /* g_pad_moves while on it */
 } Menu;
 
 static Menu k_menus[] = {
@@ -854,8 +855,10 @@ void menus_poll(void) {
          * Coming back from it, say the game's item again. */
         if (m->extra) {
             int on = im_row_on() || im_menu_on();      /* a port screen over the menu (ONLINE) too */
-            if (on) { m->on_extra = 1; continue; }
-            if (m->on_extra && im_port_recent(350)) continue;    /* a port screen opening or fading */
+            if (on) { m->on_extra = 1; m->moves = g_pad_moves; continue; }
+            /* The row's description is gone: back on the game's rows only after up or down
+             * (not while the row's own screen, the HUB or ONLINE, opens over the menu). */
+            if (m->on_extra && g_pad_moves == m->moves) continue;
             if (m->on_extra) { m->on_extra = 0; m->last = -2; }
         }
         if (c < 0 || c >= m->count || c == m->last) continue;

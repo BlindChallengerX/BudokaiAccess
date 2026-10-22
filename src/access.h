@@ -77,6 +77,7 @@ void pad_shutdown(void);
 void pad_inject(const char *names, int ms);
 void pad_pin(uint32_t addr, uint32_t val, int ms);
 extern volatile uint16_t g_pad_buttons;
+extern volatile LONG g_pad_moves;
 extern volatile uint8_t g_pad_lt, g_pad_rt;
 extern volatile int16_t g_pad_lx, g_pad_ly, g_pad_rx, g_pad_ry;
 

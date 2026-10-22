@@ -164,7 +164,8 @@ static int kind_of(uint32_t col) {
 }
 
 static int build_lines(ImText *f, int n, Line *l, int maxl) {
-    int nl = 0, para = -1;
+    int nl = 0;
+    /* each text once, with the strongest row colour any of its draws had */
     for (int i = 0; i < n && nl < maxl; i++) {
         ImText *t = &f[i];
         if (!strcmp(t->s, "Debug")) continue;          /* ImGui's implicit window */
@@ -179,20 +180,8 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
                 l[j].off |= off;
             }
         if (dup) continue;
-        Line *last = nl ? &l[nl - 1] : NULL;
-        float gap = last ? t->y - last->y : 0;
-        int joins = last && last->list == t->list && last->size == t->size && t->size > 0 &&
-                    gap > t->size * 0.5f && gap < t->size * 1.9f;
-        if (!joins) para++;
-        l[nl].s = t->s; l[nl].list = t->list; l[nl].x = t->x; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind; l[nl].off = off;
+        l[nl].s = t->s; l[nl].list = t->list; l[nl].x = t->x; l[nl].y = t->y; l[nl].size = t->size; l[nl].kind = kind; l[nl].off = off;
         nl++;
-    }
-    /* Menu rows stand alone; a row-coloured line inside a block of lines is text. */
-    for (int k = 0; k < nl; k++) {
-        if (l[k].kind == K_TEXT) continue;
-        int lines = 0;
-        for (int j = 0; j < nl; j++) lines += l[j].para == l[k].para;
-        if (lines > 1) l[k].kind = K_TEXT;
     }
     /* A row colour only makes a row when a highlighted row of that list and size is up
      * (the transform selector's "Ki to transform" line uses the row colour too). */
@@ -201,6 +190,16 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
         int list = 0;
         for (int j = 0; j < nl && !list; j++) list = l[j].kind == K_ROW_SEL && l[j].list == l[k].list && l[j].size == l[k].size;
         if (!list) l[k].kind = K_TEXT;
+    }
+    /* paragraphs: text lines that continue one another; menu rows stand alone */
+    int para = -1;
+    for (int k = 0; k < nl; k++) {
+        Line *last = k ? &l[k - 1] : NULL;
+        float gap = last ? l[k].y - last->y : 0;
+        int joins = last && last->kind == K_TEXT && l[k].kind == K_TEXT && last->list == l[k].list &&
+                    last->size == l[k].size && l[k].size > 0 && gap > l[k].size * 0.5f && gap < l[k].size * 1.9f;
+        if (!joins) para++;
+        l[k].para = para;
     }
     return nl;
 }
@@ -333,10 +332,9 @@ void im_poll(void) {
         for (int k = 0; k < nl; k++) if (row_name(l[k].s)) g_row_seen = now;
         /* Highlighted rows (a screen can have more than one: Tag Team's team slot and form
          * picker): say each one that changes, with its place among the rows of its list. */
-        int nsel = 0;
+        int said = 0;
         for (int k = 0; k < nl; k++) {
             if (l[k].kind != K_ROW_SEL) continue;
-            nsel++;
             g_sel_seen = now;
             int known = 0;
             for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
@@ -365,8 +363,9 @@ void im_poll(void) {
             if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
             if (g_im_mute) continue;
             const char *off = l[k].off ? ", unavailable" : "";
-            if (others) speakf(nsel == 1, "%s%s, %d of %d", say, off, pos + 1, nrows);
-            else speakf(nsel == 1, "%s%s", say, off);
+            if (others) speakf(!said, "%s%s, %d of %d", say, off, pos + 1, nrows);   /* the first change cuts off older speech */
+            else speakf(!said, "%s%s", say, off);
+            said++;
             log_line("imgui row: %s (%d of %d)", l[k].s, pos + 1, nrows);
         }
         for (int i = 0; i < NSEL; i++)        /* a selector that hides while the game scrolls stays quiet */
