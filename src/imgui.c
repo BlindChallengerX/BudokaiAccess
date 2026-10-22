@@ -11,6 +11,7 @@
 #include "access.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "MinHook.h"
 
 typedef struct { float x, y; } ImVec2;
@@ -278,6 +279,22 @@ int im_port_recent(DWORD ms) {
 }
 
 void im_mute(int on) { g_im_mute = on; }
+
+/* Safety net: a highlighted row said more than 3 times in 2 seconds goes quiet for 10 seconds
+ * (two texts fighting over one spot would otherwise repeat every frame). */
+static int row_flood(const char *s, DWORD now) {
+    static struct { char s[64]; DWORD since, quiet; int n; } h[8];
+    int i, oldest = 0;
+    for (i = 0; i < 8; i++) {
+        if (!strncmp(h[i].s, s, 63)) break;
+        if (h[i].since < h[oldest].since) oldest = i;
+    }
+    if (i == 8) { i = oldest; snprintf(h[i].s, sizeof h[i].s, "%s", s); h[i].since = now; h[i].n = 0; h[i].quiet = 0; }
+    if (now < h[i].quiet) return 1;
+    if (now - h[i].since > 2000) { h[i].since = now; h[i].n = 0; }
+    if (++h[i].n > 3) { h[i].quiet = now + 10000; log_line("imgui: %s keeps repeating, quiet for now", s); return 1; }
+    return 0;
+}
 const char *im_row(void) { return g_last_row; }
 
 static int slot_of(const Line *p) {
@@ -340,15 +357,18 @@ void im_poll(void) {
             for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
             for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
             if (known) continue;
-            /* forget what was at the same spot (text is centred, so only height and side count), take the oldest entry */
+            /* forget what was at the same spot (rows are centred: compare centres, text width
+             * guessed from its length), then take a free or the oldest entry */
+            float cx = l[k].x + (float)strlen(l[k].s) * l[k].size * 0.25f;
             int slot = 0;
             for (int i = 0; i < NSEL; i++) {
-                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && (g_sels[i].x < 640) == (l[k].x < 640) &&
+                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && fabsf(g_sels[i].x - cx) < l[k].size * 2 &&
                     g_sels[i].y > l[k].y - l[k].size * 0.5f && g_sels[i].y < l[k].y + l[k].size * 0.5f) g_sels[i].s[0] = 0;
                 if (!g_sels[i].s[0] ? g_sels[slot].s[0] != 0 : g_sels[i].seen < g_sels[slot].seen && g_sels[slot].s[0]) slot = i;
             }
             snprintf(g_sels[slot].s, sizeof g_sels[slot].s, "%s", l[k].s);
-            g_sels[slot].list = l[k].list; g_sels[slot].x = l[k].x; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
+            g_sels[slot].list = l[k].list; g_sels[slot].x = cx; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
+            if (row_flood(l[k].s, now)) continue;
             snprintf(g_sel, sizeof g_sel, "%s", l[k].s);
             g_sel_said = now;
             int nrows = 1, pos = 0, others = 0;
