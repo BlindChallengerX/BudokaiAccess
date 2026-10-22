@@ -149,7 +149,7 @@ void im_dump(void) {
  * spoken together, so a box whose last line stays (the HUB's "Rank: ...")
  * only says what changed. A spot on screen whose text keeps changing (a
  * timer, a counter) goes quiet for a while. */
-typedef struct { const char *s; void *list; float y, size; int para; int kind; int off; } Line;
+typedef struct { const char *s; void *list; float x, y, size; int para; int kind; int off; } Line;
 
 /* Menu rows of the port's screens are drawn by its style::MenuText in fixed
  * colours (top half of the letters): the highlighted row, an ordinary row, a
@@ -184,7 +184,7 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
         int joins = last && last->list == t->list && last->size == t->size && t->size > 0 &&
                     gap > t->size * 0.5f && gap < t->size * 1.9f;
         if (!joins) para++;
-        l[nl].s = t->s; l[nl].list = t->list; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind; l[nl].off = off;
+        l[nl].s = t->s; l[nl].list = t->list; l[nl].x = t->x; l[nl].y = t->y; l[nl].size = t->size; l[nl].para = para; l[nl].kind = kind; l[nl].off = off;
         nl++;
     }
     /* Menu rows stand alone; a row-coloured line inside a block of lines is text. */
@@ -263,7 +263,7 @@ static char g_last_row[64];
 static DWORD g_row_seen;           /* when a row description was last on screen */
 static char g_sel[IM_TEXT];        /* highlighted menu row last spoken, as drawn */
 #define NSEL 16
-static struct { char s[IM_TEXT]; void *list; float y; DWORD seen; } g_sels[NSEL];   /* highlighted rows on screen */
+static struct { char s[IM_TEXT]; void *list; float x, y; DWORD seen; } g_sels[NSEL];   /* highlighted rows on screen */
 static DWORD g_sel_said;
 
 /* Is the cursor on one of the port's rows (its description is up)? */
@@ -342,14 +342,15 @@ void im_poll(void) {
             for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
             for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
             if (known) continue;
-            /* replace the entry of the same spot, else the oldest */
+            /* forget what was at the same spot (text is centred, so only height and side count), take the oldest entry */
             int slot = 0;
             for (int i = 0; i < NSEL; i++) {
-                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && g_sels[i].y > l[k].y - l[k].size * 0.5f && g_sels[i].y < l[k].y + l[k].size * 0.5f) { slot = i; break; }
-                if (g_sels[i].seen < g_sels[slot].seen) slot = i;
+                if (g_sels[i].s[0] && g_sels[i].list == l[k].list && (g_sels[i].x < 640) == (l[k].x < 640) &&
+                    g_sels[i].y > l[k].y - l[k].size * 0.5f && g_sels[i].y < l[k].y + l[k].size * 0.5f) g_sels[i].s[0] = 0;
+                if (!g_sels[i].s[0] ? g_sels[slot].s[0] != 0 : g_sels[i].seen < g_sels[slot].seen && g_sels[slot].s[0]) slot = i;
             }
             snprintf(g_sels[slot].s, sizeof g_sels[slot].s, "%s", l[k].s);
-            g_sels[slot].list = l[k].list; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
+            g_sels[slot].list = l[k].list; g_sels[slot].x = l[k].x; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
             snprintf(g_sel, sizeof g_sel, "%s", l[k].s);
             g_sel_said = now;
             int nrows = 1, pos = 0, others = 0;
