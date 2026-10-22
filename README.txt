@@ -1,19 +1,23 @@
-Budokai 3 Access 1.0.11
+Budokai 3 Access 1.1.0 nightly
 
 A screen reader mod for Dragon Ball Z Budokai 3 on PC. It speaks through
 your screen reader (NVDA, JAWS and others), or the Windows voice if none is
 running.
 
-Budokai 1 Access, the same kind of mod for Budokai 1, comes from the same
-page. BudokaiAccess-1and3.zip holds both mods:
+THIS IS A NIGHTLY BUILD. It follows the newest versions of the port (1.5
+and later), which change almost every day, so expect rough edges. If you
+want things to just work, use the stable build instead (1.0.11, for port
+1.4), from the page's latest release:
 https://github.com/BlindChallengerX/BudokaiAccess/releases/latest
+You can tell the builds apart: this one says "Budokai 3 Access nightly
+loaded" when the game starts.
 
 
 WHAT YOU NEED
 
-- The Budokai 3 HD PC port by NovaPowers. Tested with versions 1.4.3.1 and
-  1.4.2.3:
-  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.4.3.1
+- The Budokai 3 HD PC port by NovaPowers. This nightly was tested with
+  version 1.5.1.4:
+  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.5.1.4
 - Your own copy of the game, USA version, set up as the port explains.
   Get the game running first, then add this mod. SETUP-GUIDE.txt on the
   mod's GitHub page explains the whole setup in English.
@@ -21,16 +25,55 @@ WHAT YOU NEED
 
 INSTALL
 
-1. Unzip Budokai3Access-1.0.11.zip into the game folder, the folder with dbz3.exe.
+1. Unzip Budokai3Access-1.1.0-nightly.zip into the game folder, the folder
+   with dbz3.exe. It replaces the stable build if you had it there.
 2. Run "Play Budokai 3 Access.exe" from that folder.
 
 If Windows says "Windows protected your PC", choose "More info", then
 "Run anyway". This shows for new programs that are not from a big company.
 
 That's it. Always start the game with "Play Budokai 3 Access.exe". The game
-starts straight away and you should hear "Budokai 3 Access loaded". (The
-port's launcher is skipped, because screen readers cannot read it. See THE
-PORT'S SETTINGS below.)
+starts straight away and you should hear "Budokai 3 Access nightly loaded".
+(The port's launcher is skipped. See THE PORT'S SETTINGS below.)
+
+
+NEW IN THE NIGHTLY (PORT 1.5)
+
+The port's own new screens are read: as you move, the highlighted row is
+said with its place ("HOST A MATCH, 1 of 5"), rows you can't pick yet say
+"unavailable", and the description under it follows. F2 reads the whole
+screen, F5 the highlighted row.
+
+- Main menu: HUB is the 8th row (up from Dragon Universe).
+- HUB: every mode by name with its description, page 1 and 2 (LB, RB).
+- Dueling: ONLINE is the 5th row; its screen reads the room code, port and
+  delay rows and the connection messages.
+- Tag Team: the 1P versus computer rows, team size and points, team
+  picking on the wheel, and the partner cards in the fight (including KO).
+- Tower, Survival, Kumite, Mission 100, Gateway and the Hero Mode creator:
+  their lists and descriptions.
+- Character select: the transformation picker (LT, RT) and the extra
+  fighters from Nova's Mods (Janemba, the Ginyu Force, the Infinite World
+  pack and the rest) by name.
+- Stage select: the stages the port builds from your Budokai 2 disc, by
+  name in English.
+
+Known limits:
+- Online play probably fails between a player with this mod and one
+  without it: the port checks that both players have the same program
+  files, and the mod's loader is one of them. Not solved yet.
+- The Budokai 2 board and the Infinite World map open and their menus
+  read, but the board itself is not read yet, so they can't be played by
+  ear.
+- Some of the new fighters still play and sound rough; that's the port's
+  work in progress.
+- Port bug with the USA disc: the stages from your PS2 Budokai 2 and
+  Infinite World discs are not built, because the port looks for
+  us\data_eng.afs, a file only the European disc has. Until the port is
+  fixed, a copy of us\data_usi.afs named data_eng.afs in the same folder
+  works around it.
+- Names the port shows in Spanish for some Nova's Mods fighters and stages
+  are said in English by the mod for the ones it knows.
 
 
 PLAYING WITH A KEYBOARD
@@ -86,6 +129,12 @@ The port has its own launcher window with its settings, but it is drawn by
 the game and screen readers see an empty window (Tab moves around it, but
 nothing is spoken). So the first time you run "Play Budokai 3 Access.exe" it
 sets the game to skip the launcher and start straight away.
+
+With this nightly the mod also runs in the launcher and reads out each tab
+as it opens, all at once rather than as you move. You need the launcher for
+Nova's Mods (extra fighters) and for picking your PS2 discs (Game tab, "Pick
+ISO", which opens a normal Windows file box). It is still easiest with
+sighted help.
 
 You can change the settings in the file dbz3_user.toml in the game folder
 instead. Close the game, open the file in Notepad, change or add a line and
