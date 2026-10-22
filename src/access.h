@@ -129,6 +129,12 @@ int im_any_text(void);
 const char *im_find(const char *prefix);
 int im_read_all(int interrupt);
 
+/* roster.c: characters and capsules added by roster mods (mods\_rosteroster.toml) */
+const char *roster_char_name(int id);
+const char *roster_capsule_name(int id);
+int roster_wheel_cell(uint32_t work);
+const char *roster_cell_name(uint32_t work);
+
 /* menus.c */
 void menus_poll(void);
 int menus_read_current(void);

@@ -16,6 +16,7 @@
 #define CAPSULE_NAMES 0x69475272u
 const char *capsule_name(int id) {
     const char *t = text_lookup(CAPSULE_NAMES, (uint32_t)id);
+    if (!t) t = roster_capsule_name(id);         /* capsules of characters added by mods */
     return t ? t : "unknown skill";
 }
 
@@ -255,7 +256,8 @@ static void pause_poll(void) {
  * Port 1.5 adds stages (Budokai 1/2 and Infinite World ones made from the
  * player's discs): ID 13 + k is the k-th [[escenario]] of the enabled mods'
  * stage.toml files (mods in folder order, ones with selector = false left
- * out), named by its titulo (or nombre). */
+ * out, and the "Campo IW" folders: Infinite World minigame fields), named
+ * by its titulo (or nombre). */
 #define STAGE_CAPSULE0 517
 static int g_stage_last = -1;
 static char g_new_stages[48][64];
@@ -273,6 +275,29 @@ static void stage_value(char *line, char *out, size_t cap) {
     while (n && (out[n - 1] == ' ' || out[n - 1] == '\t')) out[--n] = 0;
 }
 
+/* English names for the stages the port makes from the player's PS2 discs
+ * (their stage.toml titles are Spanish). */
+static const struct { const char *es, *en; } k_stage_en[] = {
+    { "Templo (B2)", "Kami's Lookout (Budokai 2)" },
+    { "Muscle Tower (B2)", "Muscle Tower (Budokai 2)" },
+    { "Base de la Red Ribbon (B2)", "Red Ribbon Base (Budokai 2)" },
+    { "Zona urbana (B2)", "Urban Area (Budokai 2)" },
+    { "Planeta Namek (B2)", "Planet Namek (Budokai 2)" },
+    { "Llanura (B2)", "Plains (Budokai 2)" },
+    { "Mundo de Kaiyoshin (B2)", "Supreme Kai's World (Budokai 2)" },
+    { "Nave de Goku por dentro (IW)", "Inside Goku's Ship (Infinite World)" },
+    { "Tierra en vuelo (IW)", "Flying over Earth (Infinite World)" },
+    { "Namek en vuelo (IW)", "Flying over Namek (Infinite World)" },
+    { "Camino de la Serpiente (IW)", "Snake Way (Infinite World)" },
+    { "Planeta del Kaio (IW)", "King Kai's Planet (Infinite World)" },
+    { "Namek que explota (IW)", "Exploding Namek (Infinite World)" },
+    { "Llanura de Raditz (IW)", "Raditz's Plain (Infinite World)" },
+    { "Llanura de Piccolo (IW)", "Piccolo's Plain (Infinite World)" },
+    { "Roquedal (IW)", "Rocky Field (Infinite World)" },
+    { "Páramo al atardecer", "Wasteland at Sunset (Budokai 1)" },
+    { "Ring de Cell (B1)", "Cell Ring (Budokai 1)" },
+};
+
 static void load_new_stages(void) {
     g_nnew_stages = 0;
     wchar_t pat[MAX_PATH];
@@ -282,6 +307,7 @@ static void load_new_stages(void) {
     if (h == INVALID_HANDLE_VALUE) return;
     do {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == L'.') continue;
+        if (!wcsncmp(fd.cFileName, L"Campo IW", 8)) continue;    /* Infinite World minigame fields: the port keeps them off the list */
         wchar_t path[MAX_PATH];
         swprintf(path, MAX_PATH, L"%lsmods\\%ls\\.disabled", g_game_dir, fd.cFileName);
         if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) continue;
@@ -294,7 +320,12 @@ static void load_new_stages(void) {
             int eof = !fgets(line, sizeof line, f);
             char *t = line; while (*t == ' ' || *t == '\t') t++;
             if (eof || *t == '[') {
-                if (in && shown && g_nnew_stages < 48) snprintf(g_new_stages[g_nnew_stages++], 64, "%s", title[0] ? title : name);
+                if (in && shown && g_nnew_stages < 48) {
+                    const char *t = title[0] ? title : name;
+                    for (size_t i = 0; i < sizeof k_stage_en / sizeof k_stage_en[0]; i++)
+                        if (!strcmp(t, k_stage_en[i].es)) t = k_stage_en[i].en;
+                    snprintf(g_new_stages[g_nnew_stages++], 64, "%s", t);
+                }
                 in = !eof && (!strncmp(t, "[[escenario]]", 13) || !strncmp(t, "[escenario]", 11));
                 name[0] = title[0] = 0; shown = 1;
                 if (eof) break;
@@ -521,6 +552,7 @@ static void sysq_poll(void) {
 #define CS_NAME_FIRST 26          /* name pictures 26..64 (63 is "Random or locked") */
 #define CS_NAME_LAST  64
 static int g_cs_last[2] = { -1, -1 }, g_cs_seen[2] = { -1, -1 }, g_cs_any;
+static uint32_t g_cs_work[2];
 static DWORD g_cs_since[2];
 static char g_cs_name[2][64];
 
@@ -539,6 +571,9 @@ static const char *cs_name(int k, int id, char *buf, size_t cap) {
 static void cs_say(int k, int id, int interrupt) {
     char name[64];
     /* drawn this moment, not lingering from the slot just left (it is drawn every frame while shown) */
+    /* a cell added by a roster mod has its host's slot number: name it from the wheel */
+    const char *added = g_cs_work[k] ? roster_cell_name(g_cs_work[k]) : NULL;
+    if (added) { speak_utf8(added, interrupt); snprintf(g_cs_name[k], sizeof g_cs_name[k], "%s", added); return; }
     if (text_visible_within(CS_NAMES, 63, 60)) { speak(L"Random or locked character", interrupt); g_cs_name[k][0] = 0; return; }
     if (!cs_name(k, id, name, sizeof name)) snprintf(name, sizeof name, "Character %d", id);
     speak_utf8(name, interrupt);
@@ -553,11 +588,13 @@ static void cs_poll(void) {
     text_mute_pack_except(CS_NAMES, 25);      /* names come from here; "Computer" still read */
     for (int k = 0; k < 2; k++) {
         if (k >= n || !guest_ok(w[k] + 4, 1)) { g_cs_last[k] = g_cs_seen[k] = -1; continue; }
-        int id = g8(w[k] + 4);
+        g_cs_work[k] = w[k];
+        /* slot and wheel cell together: new cells share their host's slot */
+        int id = g8(w[k] + 4) | (roster_wheel_cell(w[k]) + 1) << 8;
         if (id != g_cs_seen[k]) { g_cs_seen[k] = id; g_cs_since[k] = GetTickCount(); }
         /* speak once the cursor rests: the picture for locked characters follows it */
         if (id != g_cs_last[k] && GetTickCount() - g_cs_since[k] >= 150) {
-            cs_say(k, id, g_cs_last[k] >= 0);
+            cs_say(k, id & 0xff, g_cs_last[k] >= 0);
             g_cs_last[k] = id;
         }
     }
