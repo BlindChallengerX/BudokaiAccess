@@ -127,6 +127,7 @@ int im_menu_on(void);
 int im_port_recent(DWORD ms);
 int im_any_text(void);
 const char *im_find(const char *prefix);
+void im_dialog_poll(void);   /* the port's ISO file dialog: bring it forward */
 int im_read_all(int interrupt);
 
 /* roster.c: characters and capsules added by roster mods (mods\_rosteroster.toml) */

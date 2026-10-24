@@ -261,7 +261,7 @@ static int build_lines(ImText *f, int n, Line *l, int maxl) {
 }
 
 /* The HUB's rows are pictures; the description under them names the row. */
-static const struct { const char *start, *name; } k_rows[] = {
+static const struct { const char *start, *name, *also; } k_rows[] = {
     { "Tag Team, Online, quick battle", "HUB" },          /* main menu row */
     { "Teams of 2 or 3 fighters", "Tag Team" },
     { "Play against another person over the internet", "Online" },
@@ -272,7 +272,8 @@ static const struct { const char *start, *name; } k_rows[] = {
     { "Each fighter's rank", "Ranking" },
     { "Practice against a dummy", "Laboratory" },
     { "Stories and missions from Budokai 2", "Gateway" },
-    { "Needs your copy of Dragon Ball Z", "Legend of Hercule, not available" },   /* short: the line wraps */
+    /* Gateway's Budokai 1 and 2 rows start the same way; only the HUB's says "and pick" */
+    { "Needs your copy of Dragon Ball Z Budokai", "Legend of Hercule, not available", "Press A and pick its ISO" },
     { "A hundred missions by saga", "Mission 100" },
     { "Your own hero and story", "Hero Mode" },
     /* Tag Team's first screen */
@@ -304,7 +305,8 @@ static int tail_quiet(const char *line) {
 
 static const char *row_name(const char *text) {
     for (size_t i = 0; i < sizeof k_rows / sizeof k_rows[0]; i++)
-        if (!strncmp(text, k_rows[i].start, strlen(k_rows[i].start))) return k_rows[i].name;
+        if (!strncmp(text, k_rows[i].start, strlen(k_rows[i].start)) && (!k_rows[i].also || strstr(text, k_rows[i].also)))
+            return k_rows[i].name;
     return NULL;
 }
 
@@ -374,6 +376,37 @@ int im_any_text(void) {
     DWORD now = GetTickCount();
     for (int i = 0; i < IV; i++) if (g_iv[i].s[0] && now - g_iv[i].last < 300) return 1;
     return 0;
+}
+
+/* The port's "pick your ISO" file dialog (Gateway, HUB) opens on another thread,
+ * owned by whatever window was in front: bring it forward and say so, or say how
+ * to reach it. */
+static BOOL CALLBACK find_dialog(HWND h, LPARAM out) {
+    DWORD pid = 0;
+    char cls[16];
+    GetWindowThreadProcessId(h, &pid);
+    if (pid == GetCurrentProcessId() && IsWindowVisible(h) && GetClassNameA(h, cls, sizeof cls) && !strcmp(cls, "#32770")) {
+        *(HWND *)out = h;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+void im_dialog_poll(void) {
+    static HWND said;
+    static DWORD last;
+    DWORD now = GetTickCount();
+    if (now - last < 300) return;
+    last = now;
+    HWND h = NULL;
+    EnumWindows(find_dialog, (LPARAM)&h);
+    if (!h) { said = NULL; return; }
+    if (h == said) return;
+    said = h;
+    if (GetForegroundWindow() != h) SetForegroundWindow(h);
+    if (GetForegroundWindow() == h) speak_utf8("File window open: pick your PS2 disc image", 1);
+    else speak_utf8("The file window for your PS2 disc is open behind other windows: press Alt+Tab to reach it", 1);
+    log_line("imgui: ISO file window %s", GetForegroundWindow() == h ? "in front" : "behind");
 }
 
 /* A line visible now that starts with this prefix, or NULL. */

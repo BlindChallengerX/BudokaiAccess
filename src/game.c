@@ -31,6 +31,7 @@ void game_poll(void) {
     tasks_poll();
     text_poll();
     im_poll();
+    im_dialog_poll();
     menus_poll();
     fight_poll_all();
     du_poll();
