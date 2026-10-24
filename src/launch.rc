@@ -1,7 +1,7 @@
 #include <winver.h>
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,1,0,0
-PRODUCTVERSION 1,0,11,0
+FILEVERSION 1,1,1,0
+PRODUCTVERSION 1,1,1,0
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN
@@ -11,11 +11,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Budokai 3 Access (open source accessibility mod)"
       VALUE "FileDescription", "Budokai 3 Access: checks and repairs the screen reader mod, then starts the game"
-      VALUE "FileVersion", "1.0.11"
+      VALUE "FileVersion", "1.1.1-nightly"
       VALUE "InternalName", "Play Budokai 3 Access"
       VALUE "OriginalFilename", "Play Budokai 3 Access.exe"
       VALUE "ProductName", "Budokai 3 Access"
-      VALUE "ProductVersion", "1.0.11"
+      VALUE "ProductVersion", "1.1.1-nightly"
     END
   END
   BLOCK "VarFileInfo"

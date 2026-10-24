@@ -1,4 +1,4 @@
-Budokai 3 Access 1.1.0 nightly
+Budokai 3 Access 1.1.1 nightly
 
 A screen reader mod for Dragon Ball Z Budokai 3 on PC. It speaks through
 your screen reader (NVDA, JAWS and others), or the Windows voice if none is
@@ -16,8 +16,8 @@ loaded" when the game starts.
 WHAT YOU NEED
 
 - The Budokai 3 HD PC port by NovaPowers. This nightly was tested with
-  version 1.5.1.4:
-  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.5.1.4
+  version 1.5.5.1:
+  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.5.5.1
 - Your own copy of the game, USA version, set up as the port explains.
   Get the game running first, then add this mod. SETUP-GUIDE.txt on the
   mod's GitHub page explains the whole setup in English.
@@ -25,7 +25,7 @@ WHAT YOU NEED
 
 INSTALL
 
-1. Unzip Budokai3Access-1.1.0-nightly.zip into the game folder, the folder
+1. Unzip Budokai3Access-1.1.1-nightly.zip into the game folder, the folder
    with dbz3.exe. It replaces the stable build if you had it there.
 2. Run "Play Budokai 3 Access.exe" from that folder.
 
@@ -44,14 +44,22 @@ said with its place ("HOST A MATCH, 1 of 5"), rows you can't pick yet say
 "unavailable", and the description under it follows. F2 reads the whole
 screen, F5 the highlighted row.
 
-- Main menu: HUB is the 8th row (up from Dragon Universe).
+- Main menu: HUB is the 8th row (up from Dragon Universe, or down from
+  the last row).
 - HUB: every mode by name with its description, page 1 and 2 (LB, RB).
-- Dueling: ONLINE is the 5th row; its screen reads the room code, port and
-  delay rows and the connection messages.
+- Dueling: ONLINE is the 5th row (down from Computer versus computer). Its
+  screen says which of the 4 steps you are on ("Step 1 of 4, HOST OR
+  JOIN"), and reads the room code, port and delay rows, the connection
+  status and the messages.
 - Tag Team: the 1P versus computer rows, team size and points, team
   picking on the wheel, and the partner cards in the fight (including KO).
-- Tower, Survival, Kumite, Mission 100, Gateway and the Hero Mode creator:
-  their lists and descriptions.
+- Tower, Survival, Kumite, Mission 100 and Gateway: their lists and
+  descriptions.
+- Hero Mode: the tutorial pages, the creator's tabs (LB, RB: Appearance,
+  Combat, Progress) and each row with its setting ("Body", "Goku"); left
+  and right say the new setting.
+- Laboratory: the rows (fighter, rival, dummy, frame capture), the last
+  fight box and the hit table (so far tested only before any practice).
 - Character select: the transformation picker (LT, RT) and the extra
   fighters from Nova's Mods (Janemba, the Ginyu Force, the Infinite World
   pack and the rest) by name.

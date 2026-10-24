@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include "MinHook.h"
 
-#define TESTED_PORT "1.5.1.4"
+#define TESTED_PORT "1.5.5.1"
 
 volatile LONG g_bind_calls, g_bind_sane;   /* counted by the texture hook (text.c) */
 static int g_checked, g_failed;

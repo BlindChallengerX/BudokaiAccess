@@ -3,7 +3,7 @@
 # stable install next to this source folder. Set GAME to deploy elsewhere.
 set -e
 cd "$(dirname "$0")"
-GAME="${GAME:-../../DBZ-Budokai-3-HD-Collection-v1.5.1.4-test}"
+GAME="${GAME:-../../DBZ-Budokai-3-HD-Collection-v1.5-test}"
 cp data/text.tsv "$GAME/Budokai3Access/text.tsv"
 cp out/Budokai3Access/Budokai3Access.dll "$GAME/Budokai3Access/Budokai3Access.dll"
 # The loader wraps the port's graphics plugin. The launcher puts it in place

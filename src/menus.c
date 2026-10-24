@@ -32,6 +32,8 @@ typedef struct {
     int extra;               /* rows the port adds below the game's own (port 1.5: HUB, ONLINE), read by imgui.c */
     int on_extra;            /* the cursor is on one of them */
     LONG moves;              /* g_pad_moves while on it */
+    DWORD wait0;             /* port 1.5.5: cursor 0 is the first row or a port row, wait for its description */
+    int closed_on_extra;     /* the menu closed from a port row (HUB, ONLINE): it comes back under that screen */
 } Menu;
 
 static Menu k_menus[] = {
@@ -57,11 +59,15 @@ static uint32_t menu_base(const Menu *m) {
 }
 
 #define LIVE_G_EARLY 0x824ba110u   /* same as LIVE_G below */
+/* The game's own rows. Main menu: Dragon Arena only once its ticket (capsule 516)
+ * is unlocked (unlock flags at G+0x2afe9 + capsule, as for the Bonus items). */
+static int menu_rows(const Menu *m) {
+    if (!strcmp(m->task, "# MAIN MENU #") && !g8(LIVE_G_EARLY + 0x2afe9 + 516)) return 6;
+    return m->count;
+}
+
 static void say_item(const Menu *m, int c, int interrupt) {
-    int n = m->count;
-    /* Main menu: Dragon Arena only once its ticket (capsule 516) is unlocked
-     * (unlock flags at G+0x2afe9 + capsule, as for the Bonus items). */
-    if (!strcmp(m->task, "# MAIN MENU #") && c < 6 && !g8(LIVE_G_EARLY + 0x2afe9 + 516)) n = 6;
+    int n = c < menu_rows(m) ? menu_rows(m) : m->count;
     if (im_ready()) n += m->extra;
     speakf(interrupt, "%s, %d of %d", m->items[c], c + 1, n);
 }
@@ -886,19 +892,42 @@ void menus_poll(void) {
     for (int i = 0; i < NMENUS; i++) {
         Menu *m = &k_menus[i];
         uint32_t w = menu_base(m);
-        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) { m->last = -1; m->on_extra = 0; continue; }
+        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) {
+            if (m->last != -1 || m->on_extra) m->closed_on_extra = m->on_extra;
+            m->last = -1; m->on_extra = 0; continue;
+        }
         int c = m->size == 4 ? (int)g32(w + m->cursor_off) : g8(w + m->cursor_off);
+        /* Port 1.5.5: leaving Online goes back to the HUB, which opens over the main menu
+         * (the menu's cursor is on Dueling then): stay quiet as on the HUB row. */
+        if (m->last == -1 && m->closed_on_extra && !strcmp(m->task, "# MAIN MENU #")) { m->on_extra = 1; m->moves = g_pad_moves; m->last = -2; }
+        m->closed_on_extra = 0;
         /* On a port row the game's cursor stays where it was; imgui.c reads the row.
          * Coming back from it, say the game's item again. */
         if (m->extra) {
             int on = im_row_on() || im_menu_on();      /* a port screen over the menu (ONLINE) too */
-            if (on) { m->on_extra = 1; m->moves = g_pad_moves; continue; }
+            if (on) { if (!m->on_extra) m->moves = g_pad_moves; m->on_extra = 1; continue; }   /* the description fades after the press that leaves */
+            /* Inside the HUB screen (its last row was not the main menu's HUB row) the game's
+             * cursor sits on 0 underneath and the descriptions blink out between rows; presses
+             * there don't count, so backing out waits for the HUB row's description. */
+            if (m->on_extra && !strcmp(m->task, "# MAIN MENU #") && strcmp(im_row(), "HUB") && (im_port_recent(800) || im_any_text())) { m->moves = g_pad_moves; continue; }
             /* The row's description is gone: back on the game's rows only after up or down
              * (not while the row's own screen, the HUB or ONLINE, opens over the menu). */
             if (m->on_extra && g_pad_moves == m->moves) continue;
             if (m->on_extra) { m->on_extra = 0; m->last = -2; }
         }
-        if (c < 0 || c >= m->count || c == m->last) continue;
+        if (c < 0 || c >= m->count || c == m->last) { m->wait0 = 0; continue; }
+        /* Port 1.5.5 sets the game's cursor to 0 on the HUB row too. From the last
+         * game row it can only be the HUB (imgui.c says it); otherwise give the row's
+         * description a moment to show before saying the first item. */
+        int hub = m->extra && !strcmp(m->task, "# MAIN MENU #");
+        if (hub && c == 0 && m->last >= 1 && m->last == menu_rows(m) - 1) {
+            m->on_extra = 1; m->moves = g_pad_moves; m->last = -2; continue;
+        }
+        if (hub && c == 0 && m->last != -1) {
+            if (!m->wait0) m->wait0 = GetTickCount();
+            if (GetTickCount() - m->wait0 < 150) continue;
+        }
+        m->wait0 = 0;
         say_item(m, c, m->last != -1);
         m->last = c;
     }
