@@ -11,16 +11,29 @@ https://github.com/BlindChallengerX/BudokaiAccess/releases/latest
 
 WHAT YOU NEED
 
+- Your own copy of the game: Dragon Ball Z Budokai HD Collection for Xbox
+  360, USA version, as an ISO file.
 - The Budokai 3 HD PC port by NovaPowers. Tested with versions 1.4.3.1 and
-  1.4.2.3:
+  1.4.2.3. The easiest way to get it is the ready-to-play download on the
+  mod's release page, Budokai3Access-1.0.11-with-port-1.4.3.1.zip: the
+  port 1.4.3.1, unchanged, with this mod already added. It stays there
+  even as the port moves on:
+  https://github.com/BlindChallengerX/BudokaiAccess/releases/latest
+  The port on its own:
   https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.4.3.1
-- Your own copy of the game, USA version, set up as the port explains.
-  Get the game running first, then add this mod. SETUP-GUIDE.txt on the
-  mod's GitHub page explains the whole setup in English.
+SETUP-GUIDE.txt on the mod's GitHub page explains the whole setup in
+English.
 
 
 INSTALL
 
+With the ready-to-play download:
+1. Unzip Budokai3Access-1.0.11-with-port-1.4.3.1.zip, for example into
+   C:\Games. The folder it makes is your game folder.
+2. Put your game ISO file into that folder, next to dbz3.exe.
+3. Run "Play Budokai 3 Access.exe" from that folder.
+
+If you already have the port:
 1. Unzip Budokai3Access-1.0.11.zip into the game folder, the folder with dbz3.exe.
 2. Run "Play Budokai 3 Access.exe" from that folder.
 

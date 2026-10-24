@@ -1,6 +1,7 @@
 Budokai 3 Access: quick setup guide
 
 You need three things: the game, the port that runs it on PC, and the mod.
+The easy way gets the port and the mod in one download.
 
 
 1. THE GAME
@@ -9,38 +10,56 @@ Your own copy of Dragon Ball Z Budokai HD Collection for Xbox 360, USA
 version, as an ISO file. Neither the port nor the mod includes the game.
 
 
-2. THE PORT
+2. THE PORT AND THE MOD, THE EASY WAY
 
-Download version 1.4.3.1 of the port. The mod is tested with this version;
-newer versions may not work with it yet.
-https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/download/v1.4.3.1/DBZ-Budokai-3-HD-Collection-v1.4.3.1.zip
+Download Budokai3Access-1.0.11-with-port-1.4.3.1.zip from the mod's latest
+release:
+https://github.com/BlindChallengerX/BudokaiAccess/releases/latest
 
-Unzip it into a new folder, for example C:\Games\DBZ3. This is your game
-folder; it has dbz3.exe in it.
+It holds NovaPowers' port, version 1.4.3.1 (the version the mod is tested
+with), unchanged, with the mod already added. The port changes often and
+newer versions may not work with the mod, so this copy stays available
+there.
+
+Unzip it, for example into C:\Games. You get a folder called "Budokai 3
+Access 1.0.11 with port 1.4.3.1". This is your game folder; it has
+dbz3.exe in it. Its "READ ME FIRST.txt" says the same as this guide.
 
 Put the game's ISO file into that folder, next to dbz3.exe. The port finds
 it by itself, whatever the file is called.
 
+Then go to 3, PLAY.
+
+
+THE OTHER WAY: PORT AND MOD SEPARATELY
+
+If you already have the port, or want to set it up yourself:
+
+Download version 1.4.3.1 of the port:
+https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/download/v1.4.3.1/DBZ-Budokai-3-HD-Collection-v1.4.3.1.zip
+
+Unzip it into a new folder, for example C:\Games\DBZ3, and put the game's
+ISO file into that folder, next to dbz3.exe.
+
+Then download Budokai3Access-1.0.11.zip from the same release page as
+above and unzip it into the same game folder.
+
 The port's own instructions are in Spanish. You don't need them for this.
 
 
-3. THE MOD
-
-Download Budokai3Access-1.0.1.zip:
-https://github.com/BlindChallengerX/BudokaiAccess/releases/latest
-
-Unzip it into the same game folder.
-
-
-4. PLAY
+3. PLAY
 
 Run "Play Budokai 3 Access.exe" in the game folder. If Windows says
 "Windows protected your PC", choose "More info", then "Run anyway".
 
 The game starts straight away (the port's launcher is skipped because
-screen readers cannot read it). You should hear "Budokai 3 Access loaded".
+screen readers cannot read it). The first start takes about a minute while
+the port prepares the game. You should hear "Budokai 3 Access loaded".
 
 The keys are in Budokai3Access\README.txt.
+
+Don't update the port in that folder. For the newest port versions there
+are nightly builds of the mod on the same page, marked Pre-release.
 
 
 IF THE GAME IS NOT IN ENGLISH
@@ -48,3 +67,9 @@ IF THE GAME IS NOT IN ENGLISH
 The game starts in English. The mod only reads English game text, so if the
 game language was changed in the port's launcher, "Play Budokai 3 Access.exe"
 asks whether to switch it back. Answer Yes.
+
+
+CREDITS
+
+The port is made by NovaPowers and released under the MIT License:
+https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection
