@@ -1,4 +1,4 @@
-Budokai 3 Access 1.1.1 nightly
+Budokai 3 Access 1.1.2 nightly
 
 A screen reader mod for Dragon Ball Z Budokai 3 on PC. It speaks through
 your screen reader (NVDA, JAWS and others), or the Windows voice if none is
@@ -25,7 +25,7 @@ WHAT YOU NEED
 
 INSTALL
 
-1. Unzip Budokai3Access-1.1.1-nightly.zip into the game folder, the folder
+1. Unzip Budokai3Access-1.1.2-nightly.zip into the game folder, the folder
    with dbz3.exe. It replaces the stable build if you had it there.
 2. Run "Play Budokai 3 Access.exe" from that folder.
 
@@ -58,6 +58,9 @@ screen, F5 the highlighted row.
 - Hero Mode: the tutorial pages, the creator's tabs (LB, RB: Appearance,
   Combat, Progress) and each row with its setting ("Body", "Goku"); left
   and right say the new setting.
+- Picking a PS2 disc (Gateway, HUB): when the port's file window opens,
+  the mod brings it to the front and says "File window open". If it can't,
+  it tells you the window is behind and Alt+Tab reaches it.
 - Laboratory: the rows (fighter, rival, dummy, frame capture), the last
   fight box and the hit table (so far tested only before any practice).
 - Character select: the transformation picker (LT, RT) and the extra
@@ -73,6 +76,15 @@ Known limits:
 - The Budokai 2 board and the Infinite World map open and their menus
   read, but the board itself is not read yet, so they can't be played by
   ear.
+- Babidi's Spaceship is not read yet: its screens are pictures from your
+  Budokai 2 disc. With the USA disc the port also can't load the ship's
+  and the Budokai 2 board's graphics (it looks for DATA_UK.AFS, the USA
+  disc has DATA_US.AFS). Workaround: extract the disc's files (7-Zip
+  opens the ISO) into a folder named "Budokai 2" inside the game's
+  ps2_games folder, copy USR\DATA_US.AFS in it as USR\DATA_UK.AFS, and
+  delete ps2_games\Dragon Ball Z Budokai 2.ruta (your earlier ISO
+  choice, which would win over the folder). The file DUMMY.DAT is
+  padding and can be left out.
 - Some of the new fighters still play and sound rough; that's the port's
   work in progress.
 - Port bug with the USA disc: the stages from your PS2 Budokai 2 and

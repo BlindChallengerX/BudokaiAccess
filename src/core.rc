@@ -1,7 +1,7 @@
 #include <winver.h>
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,1,1,0
-PRODUCTVERSION 1,1,1,0
+FILEVERSION 1,1,2,0
+PRODUCTVERSION 1,1,2,0
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_DLL
 BEGIN
@@ -11,11 +11,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Budokai 3 Access (open source accessibility mod)"
       VALUE "FileDescription", "Budokai 3 Access nightly: screen reader mod for the DBZ Budokai 3 HD port"
-      VALUE "FileVersion", "1.1.1-nightly"
+      VALUE "FileVersion", "1.1.2-nightly"
       VALUE "InternalName", "Budokai3Access"
       VALUE "OriginalFilename", "Budokai3Access.dll"
       VALUE "ProductName", "Budokai 3 Access"
-      VALUE "ProductVersion", "1.1.1-nightly"
+      VALUE "ProductVersion", "1.1.2-nightly"
     END
   END
   BLOCK "VarFileInfo"
