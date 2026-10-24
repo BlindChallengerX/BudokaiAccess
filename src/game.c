@@ -11,7 +11,6 @@ static void h_fight_msg(PPCContext *c, uint8_t *b) {
 void game_init(void) {
     fight_init();
     text_init();
-    im_init();
     guest_hook(0x820deac8, (void *)h_fight_msg, (void **)&o_fight_msg);
 }
 
@@ -30,20 +29,18 @@ void game_poll(void) {
     pad_keys();
     tasks_poll();
     text_poll();
-    im_poll();
     menus_poll();
     fight_poll_all();
     du_poll();
 }
 
 void game_shutdown(void) {
-    im_shutdown();
     fight_shutdown();
 }
 
 void game_key(int vk, int shift, int ctrl) {
     (void)shift; (void)ctrl;
-    if (vk == VK_F2) { if (!im_read_all(1)) text_read_all(); }
+    if (vk == VK_F2) text_read_all();
     else if (vk == VK_F5 && du_in_field()) du_cycle(shift ? -1 : 1);
     else if (vk == VK_F5) { if (!du_menu_read() && !menus_read_current()) text_read_all(); }
     else if (vk == VK_F6 && shift) { if (du_in_field()) fight_toggle_beeps(); else fight_cycle_distance(); }

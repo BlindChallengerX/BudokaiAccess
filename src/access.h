@@ -4,7 +4,7 @@
 #include <windows.h>
 #include <stdint.h>
 
-#define MOD_VERSION "1.1.0-nightly"   /* nightly branch: port 1.5 support, may break; stable is main */
+#define MOD_VERSION "1.0.11"
 
 extern wchar_t g_game_dir[MAX_PATH];   /* folder of dbz3.exe, with trailing backslash */
 extern wchar_t g_mod_dir[MAX_PATH];    /* g_game_dir + "Budokai3Access\" */
@@ -77,7 +77,6 @@ void pad_shutdown(void);
 void pad_inject(const char *names, int ms);
 void pad_pin(uint32_t addr, uint32_t val, int ms);
 extern volatile uint16_t g_pad_buttons;
-extern volatile LONG g_pad_moves;
 extern volatile uint8_t g_pad_lt, g_pad_rt;
 extern volatile int16_t g_pad_lx, g_pad_ly, g_pad_rx, g_pad_ry;
 
@@ -109,31 +108,6 @@ void text_mute_pack_except(uint32_t sum, uint32_t keep_idx);
 void text_mute_pack2(uint32_t sum);
 void text_mute_list(uint32_t sum);
 int sysq_open(void);           /* menus.c: a save or storage Yes/No question is up */
-
-/* imgui.c: text of the port's own ImGui screens (port 1.5 and later) */
-#define IM_MAX 384
-#define IM_TEXT 400
-typedef struct { char s[IM_TEXT]; float x, y, size; uint32_t col; void *list; } ImText;
-void im_init(void);
-void im_shutdown(void);
-int im_ready(void);
-int im_frame(ImText *out, int max, LONG *frame_no);
-void im_dump(void);
-void im_poll(void);
-void im_mute(int on);
-const char *im_row(void);
-int im_row_on(void);
-int im_menu_on(void);
-int im_port_recent(DWORD ms);
-int im_any_text(void);
-const char *im_find(const char *prefix);
-int im_read_all(int interrupt);
-
-/* roster.c: characters and capsules added by roster mods (mods\_rosteroster.toml) */
-const char *roster_char_name(int id);
-const char *roster_capsule_name(int id);
-int roster_wheel_cell(uint32_t work);
-const char *roster_cell_name(uint32_t work);
 
 /* menus.c */
 void menus_poll(void);

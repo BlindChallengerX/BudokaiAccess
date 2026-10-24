@@ -97,7 +97,7 @@ static DWORD WINAPI mod_thread(LPVOID unused) {
             if (!game_has_focus()) focus_since = 0;
             else if (!focus_since) focus_since = GetTickCount();
             else if (GetTickCount() - focus_since > 1000) {
-                speak(L"Budokai 3 Access nightly loaded", 0);
+                speak(L"Budokai 3 Access loaded", 0);
                 announced = 1;
             }
         }

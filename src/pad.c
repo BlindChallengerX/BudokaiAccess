@@ -8,7 +8,6 @@
 #include "access.h"
 #include <stdio.h>
 #include <string.h>
-#include "MinHook.h"
 
 static guest_fn o_get_state;
 static volatile int g_inject_on; static volatile DWORD g_inject_until;
@@ -18,7 +17,6 @@ static volatile LONG g_pkt_bias;        /* added to the packet number so the gam
 static volatile int16_t g_inject_lx, g_inject_ly, g_inject_rx, g_inject_ry;
 static volatile uint8_t g_inject_lt, g_inject_rt;
 volatile uint16_t g_pad_buttons;        /* player 1 buttons in the last read (after injection) */
-volatile LONG g_pad_moves;              /* up/down presses so far (port screens read the pad themselves) */
 volatile uint8_t g_pad_lt, g_pad_rt;
 volatile int16_t g_pad_lx, g_pad_ly, g_pad_rx, g_pad_ry;
 
@@ -39,8 +37,7 @@ static void h_get_state(PPCContext *c, uint8_t *b) {
         if (now - t0 >= 5000) { log_line("fps %.1f", frames * 1000.0 / (now - t0)); t0 = now; frames = 0; }
     }
     uint16_t btn = g16(st + 4);
-    /* While a port screen is up the player's pad is kept from the game: test presses too. */
-    if (g_inject_on && GetTickCount() < g_inject_until && !im_menu_on()) {
+    if (g_inject_on && GetTickCount() < g_inject_until) {
         btn |= g_inject;
         *(uint16_t *)gptr(st + 4) = _byteswap_ushort(btn);
         if (g_inject_lx) *(uint16_t *)gptr(st + 8) = _byteswap_ushort((uint16_t)g_inject_lx);
@@ -51,7 +48,6 @@ static void h_get_state(PPCContext *c, uint8_t *b) {
         if (g_inject_ry) *(uint16_t *)gptr(st + 14) = _byteswap_ushort((uint16_t)g_inject_ry);
     } else if (g_inject_on) { g_inject_on = 0; InterlockedIncrement(&g_pkt_bias); }
     if (g_pkt_bias) w32(st, g32(st) + (uint32_t)g_pkt_bias);
-    if ((btn & 3) && !(g_pad_buttons & 3)) InterlockedIncrement(&g_pad_moves);
     g_pad_buttons = btn;
     g_pad_lt = g8(st + 6); g_pad_rt = g8(st + 7);
     g_pad_lx = (int16_t)g16(st + 8); g_pad_ly = (int16_t)g16(st + 10);
@@ -83,42 +79,9 @@ void pad_inject(const char *names, int ms) {
     log_line("pad inject %s (%04x) for %d ms", names, m, ms);
 }
 
-/* The port's own screens (port 1.5: ONLINE, Tag Team...) read the pad through
- * rex::input::InputSystem::GetStateForUI, not the game's import; injected
- * buttons go there too. Its X_INPUT_STATE is the guest's (big-endian): u32 packet, u16 buttons. */
-typedef uint32_t (*ui_state_fn)(void *self, uint32_t user, void *state);
-static ui_state_fn o_ui_state;
-static void *g_ui_state_target;
-static uint32_t h_ui_state(void *self, uint32_t user, void *state) {
-    InterlockedIncrement(&g_inflight);
-    uint32_t r = o_ui_state(self, user, state);
-    if (user == 0 && state && r == 0) {
-        static uint16_t prev;
-        uint16_t b = _byteswap_ushort(*(uint16_t *)((uint8_t *)state + 4));
-        if ((b & 3) && !(prev & 3)) InterlockedIncrement(&g_pad_moves);
-        prev = b;
-    }
-    if (user == 0 && state && g_inject && GetTickCount() < g_inject_until) {
-        if (r != 0) { memset(state, 0, 16); r = 0; }    /* testing with no pad plugged in */
-        *(uint16_t *)((uint8_t *)state + 4) |= _byteswap_ushort(g_inject);
-    }
-    InterlockedDecrement(&g_inflight);
-    return r;
-}
-
-static void ui_pad_init(void) {
-    HMODULE rt = GetModuleHandleW(L"rexruntime.dll");
-    g_ui_state_target = rt ? (void *)GetProcAddress(rt, "?GetStateForUI@InputSystem@input@rex@@QEAAIIPEAUX_INPUT_STATE@23@@Z") : NULL;
-    if (!g_ui_state_target) return;
-    if (MH_CreateHook(g_ui_state_target, (void *)h_ui_state, (void **)&o_ui_state) == MH_OK && MH_EnableHook(g_ui_state_target) == MH_OK)
-        log_line("pad: port screens' pad wrapped");
-    else g_ui_state_target = NULL;
-}
-
 static ULONG_PTR *g_iat_slot;
 
 void pad_shutdown(void) {
-    if (g_ui_state_target) { MH_DisableHook(g_ui_state_target); MH_RemoveHook(g_ui_state_target); g_ui_state_target = NULL; }
     if (!g_iat_slot) return;
     DWORD old;
     VirtualProtect(g_iat_slot, sizeof(void *), PAGE_READWRITE, &old);
@@ -147,7 +110,6 @@ void pad_init(void) {
             VirtualProtect(&iat->u1.Function, sizeof(void *), old, &old);
             g_iat_slot = &iat->u1.Function;
             log_line("pad: XamInputGetState wrapped");
-            ui_pad_init();
             return;
         }
     }

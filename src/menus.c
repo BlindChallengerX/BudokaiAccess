@@ -16,7 +16,6 @@
 #define CAPSULE_NAMES 0x69475272u
 const char *capsule_name(int id) {
     const char *t = text_lookup(CAPSULE_NAMES, (uint32_t)id);
-    if (!t) t = roster_capsule_name(id);         /* capsules of characters added by mods */
     return t ? t : "unknown skill";
 }
 
@@ -29,19 +28,16 @@ typedef struct {
     int count;
     const char *items[12];
     int last;                /* last cursor spoken, -1 when closed */
-    int extra;               /* rows the port adds below the game's own (port 1.5: HUB, ONLINE), read by imgui.c */
-    int on_extra;            /* the cursor is on one of them */
-    LONG moves;              /* g_pad_moves while on it */
 } Menu;
 
 static Menu k_menus[] = {
     /* Main menu: the mode under the cursor (Goku's comment on each is muted, see menus_poll).
      * Dragon Arena is the 7th item once unlocked. */
-    { "# MAIN MENU #", NULL, 0, 0x96, 1, 7, { "Dragon Universe", "Dueling", "World Tournament", "Practice", "Skill Editing", "Options", "Dragon Arena" }, -1, 1 },
+    { "# MAIN MENU #", NULL, 0, 0x96, 1, 7, { "Dragon Universe", "Dueling", "World Tournament", "Practice", "Skill Editing", "Options", "Dragon Arena" }, -1 },
     /* Character select, after choosing a fighter. */
     { "# CHARASEL #", NULL, 0, 0, 1, 3, { "Normal", "Custom", "Edit Skills" }, -1 },
     /* Dueling: who plays. */
-    { "# VS MODE #", "VS CHARASEL", 0, 0x53, 1, 4, { "1 P versus computer", "1 P versus 2 P", "Computer versus 2 P", "Computer versus computer" }, -1, 1 },
+    { "# VS MODE #", "VS CHARASEL", 0, 0x53, 1, 4, { "1 P versus computer", "1 P versus 2 P", "Computer versus 2 P", "Computer versus computer" }, -1 },
     /* Dragon Arena: who fights. */
     { "# ARENA MODE #", "# ARENA CHARASE", 0, 0x35, 1, 3, { "1 P versus computer", "1 P versus 2 P", "Computer versus computer" }, -1 },
     /* Dragon Universe title menu. */
@@ -62,7 +58,6 @@ static void say_item(const Menu *m, int c, int interrupt) {
     /* Main menu: Dragon Arena only once its ticket (capsule 516) is unlocked
      * (unlock flags at G+0x2afe9 + capsule, as for the Bonus items). */
     if (!strcmp(m->task, "# MAIN MENU #") && c < 6 && !g8(LIVE_G_EARLY + 0x2afe9 + 516)) n = 6;
-    if (im_ready()) n += m->extra;
     speakf(interrupt, "%s, %d of %d", m->items[c], c + 1, n);
 }
 
@@ -252,106 +247,17 @@ static void pause_poll(void) {
  * Task "STAGE SELECT", work data: +0x244 the stages you can pick (16-bit
  * IDs, -1 after the last), +0x25d the stage under the cursor, +0x260 its
  * position in that list, +0x261 how many there are. Stage ID 0..11 is the
- * stage capsule 517 + ID (its name is in the capsule names); 12 is random.
- * Port 1.5 adds stages (Budokai 1/2 and Infinite World ones made from the
- * player's discs): ID 13 + k is the k-th [[escenario]] of the enabled mods'
- * stage.toml files (mods in folder order, ones with selector = false left
- * out, and the "Campo IW" folders: Infinite World minigame fields), named
- * by its titulo (or nombre). */
+ * stage capsule 517 + ID (its name is in the capsule names); 12 is random. */
 #define STAGE_CAPSULE0 517
 static int g_stage_last = -1;
-static char g_new_stages[48][64];
-static int g_nnew_stages = -1;
-
-static void stage_value(char *line, char *out, size_t cap) {
-    char *v = strchr(line, '=');
-    if (!v) { out[0] = 0; return; }
-    v++;
-    while (*v == ' ' || *v == '\t') v++;
-    if (*v == '"') { v++; char *e = strchr(v, '"'); if (e) *e = 0; }
-    else { char *e = strpbrk(v, "#\r\n"); if (e) *e = 0; }
-    snprintf(out, cap, "%s", v);
-    size_t n = strlen(out);
-    while (n && (out[n - 1] == ' ' || out[n - 1] == '\t')) out[--n] = 0;
-}
-
-/* English names for the stages the port makes from the player's PS2 discs
- * (their stage.toml titles are Spanish). */
-static const struct { const char *es, *en; } k_stage_en[] = {
-    { "Templo (B2)", "Kami's Lookout (Budokai 2)" },
-    { "Muscle Tower (B2)", "Muscle Tower (Budokai 2)" },
-    { "Base de la Red Ribbon (B2)", "Red Ribbon Base (Budokai 2)" },
-    { "Zona urbana (B2)", "Urban Area (Budokai 2)" },
-    { "Planeta Namek (B2)", "Planet Namek (Budokai 2)" },
-    { "Llanura (B2)", "Plains (Budokai 2)" },
-    { "Mundo de Kaiyoshin (B2)", "Supreme Kai's World (Budokai 2)" },
-    { "Nave de Goku por dentro (IW)", "Inside Goku's Ship (Infinite World)" },
-    { "Tierra en vuelo (IW)", "Flying over Earth (Infinite World)" },
-    { "Namek en vuelo (IW)", "Flying over Namek (Infinite World)" },
-    { "Camino de la Serpiente (IW)", "Snake Way (Infinite World)" },
-    { "Planeta del Kaio (IW)", "King Kai's Planet (Infinite World)" },
-    { "Namek que explota (IW)", "Exploding Namek (Infinite World)" },
-    { "Llanura de Raditz (IW)", "Raditz's Plain (Infinite World)" },
-    { "Llanura de Piccolo (IW)", "Piccolo's Plain (Infinite World)" },
-    { "Roquedal (IW)", "Rocky Field (Infinite World)" },
-    { "Páramo al atardecer", "Wasteland at Sunset (Budokai 1)" },
-    { "Ring de Cell (B1)", "Cell Ring (Budokai 1)" },
-};
-
-static void load_new_stages(void) {
-    g_nnew_stages = 0;
-    wchar_t pat[MAX_PATH];
-    swprintf(pat, MAX_PATH, L"%lsmods\\*", g_game_dir);
-    WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW(pat, &fd);           /* NTFS lists folders in name order, like the port */
-    if (h == INVALID_HANDLE_VALUE) return;
-    do {
-        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == L'.') continue;
-        if (!wcsncmp(fd.cFileName, L"Campo IW", 8)) continue;    /* Infinite World minigame fields: the port keeps them off the list */
-        wchar_t path[MAX_PATH];
-        swprintf(path, MAX_PATH, L"%lsmods\\%ls\\.disabled", g_game_dir, fd.cFileName);
-        if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) continue;
-        swprintf(path, MAX_PATH, L"%lsmods\\%ls\\stage.toml", g_game_dir, fd.cFileName);
-        FILE *f = _wfopen(path, L"r");
-        if (!f) continue;
-        char line[512], name[64] = "", title[64] = "";
-        int in = 0, shown = 1;
-        for (;;) {
-            int eof = !fgets(line, sizeof line, f);
-            char *t = line; while (*t == ' ' || *t == '\t') t++;
-            if (eof || *t == '[') {
-                if (in && shown && g_nnew_stages < 48) {
-                    const char *t = title[0] ? title : name;
-                    for (size_t i = 0; i < sizeof k_stage_en / sizeof k_stage_en[0]; i++)
-                        if (!strcmp(t, k_stage_en[i].es)) t = k_stage_en[i].en;
-                    snprintf(g_new_stages[g_nnew_stages++], 64, "%s", t);
-                }
-                in = !eof && (!strncmp(t, "[[escenario]]", 13) || !strncmp(t, "[escenario]", 11));
-                name[0] = title[0] = 0; shown = 1;
-                if (eof) break;
-                continue;
-            }
-            if (!in) continue;
-            char v[64];
-            if (!strncmp(t, "titulo", 6)) stage_value(t, title, sizeof title);
-            else if (!strncmp(t, "nombre", 6)) stage_value(t, name, sizeof name);
-            else if (!strncmp(t, "selector", 8)) { stage_value(t, v, sizeof v); shown = strcmp(v, "false") && strcmp(v, "no") && strcmp(v, "0"); }
-        }
-        fclose(f);
-    } while (FindNextFileW(h, &fd));
-    FindClose(h);
-    log_line("stages added by mods: %d", g_nnew_stages);
-}
 
 static int stage_say(int interrupt) {
     uint32_t w = task_work("STAGE SELECT");
     if (!w || !guest_ok(w + 0x244, 0x20)) return 0;
     int id = g8(w + 0x25d), pos = g8(w + 0x260), n = g8(w + 0x261);
-    if (n < 1 || n > 64 || pos >= n) return 0;
-    if (g_nnew_stages < 0) load_new_stages();
-    const char *name = id == 12 ? "Random stage" : id < 12 ? capsule_name(STAGE_CAPSULE0 + id)
-                     : id - 13 < g_nnew_stages && g_new_stages[id - 13][0] ? g_new_stages[id - 13] : "Stage";
-    speakf(interrupt, "%s, %d of %d", name, pos + 1, n);
+    if (n < 1 || n > 13 || pos >= n) return 0;
+    speakf(interrupt, "%s, %d of %d", id == 12 ? "Random stage" : id < 12 ? capsule_name(STAGE_CAPSULE0 + id) : "Stage",
+           pos + 1, n);
     return 1;
 }
 
@@ -552,7 +458,6 @@ static void sysq_poll(void) {
 #define CS_NAME_FIRST 26          /* name pictures 26..64 (63 is "Random or locked") */
 #define CS_NAME_LAST  64
 static int g_cs_last[2] = { -1, -1 }, g_cs_seen[2] = { -1, -1 }, g_cs_any;
-static uint32_t g_cs_work[2];
 static DWORD g_cs_since[2];
 static char g_cs_name[2][64];
 
@@ -571,9 +476,6 @@ static const char *cs_name(int k, int id, char *buf, size_t cap) {
 static void cs_say(int k, int id, int interrupt) {
     char name[64];
     /* drawn this moment, not lingering from the slot just left (it is drawn every frame while shown) */
-    /* a cell added by a roster mod has its host's slot number: name it from the wheel */
-    const char *added = g_cs_work[k] ? roster_cell_name(g_cs_work[k]) : NULL;
-    if (added) { speak_utf8(added, interrupt); snprintf(g_cs_name[k], sizeof g_cs_name[k], "%s", added); return; }
     if (text_visible_within(CS_NAMES, 63, 60)) { speak(L"Random or locked character", interrupt); g_cs_name[k][0] = 0; return; }
     if (!cs_name(k, id, name, sizeof name)) snprintf(name, sizeof name, "Character %d", id);
     speak_utf8(name, interrupt);
@@ -588,13 +490,11 @@ static void cs_poll(void) {
     text_mute_pack_except(CS_NAMES, 25);      /* names come from here; "Computer" still read */
     for (int k = 0; k < 2; k++) {
         if (k >= n || !guest_ok(w[k] + 4, 1)) { g_cs_last[k] = g_cs_seen[k] = -1; continue; }
-        g_cs_work[k] = w[k];
-        /* slot and wheel cell together: new cells share their host's slot */
-        int id = g8(w[k] + 4) | (roster_wheel_cell(w[k]) + 1) << 8;
+        int id = g8(w[k] + 4);
         if (id != g_cs_seen[k]) { g_cs_seen[k] = id; g_cs_since[k] = GetTickCount(); }
         /* speak once the cursor rests: the picture for locked characters follows it */
         if (id != g_cs_last[k] && GetTickCount() - g_cs_since[k] >= 150) {
-            cs_say(k, id & 0xff, g_cs_last[k] >= 0);
+            cs_say(k, id, g_cs_last[k] >= 0);
             g_cs_last[k] = id;
         }
     }
@@ -886,20 +786,10 @@ void menus_poll(void) {
     for (int i = 0; i < NMENUS; i++) {
         Menu *m = &k_menus[i];
         uint32_t w = menu_base(m);
-        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) { m->last = -1; m->on_extra = 0; continue; }
+        if (!w || (m->not_task && task_running(m->not_task)) || !guest_ok(w + m->cursor_off, m->size)) { m->last = -1; continue; }
         int c = m->size == 4 ? (int)g32(w + m->cursor_off) : g8(w + m->cursor_off);
-        /* On a port row the game's cursor stays where it was; imgui.c reads the row.
-         * Coming back from it, say the game's item again. */
-        if (m->extra) {
-            int on = im_row_on() || im_menu_on();      /* a port screen over the menu (ONLINE) too */
-            if (on) { m->on_extra = 1; m->moves = g_pad_moves; continue; }
-            /* The row's description is gone: back on the game's rows only after up or down
-             * (not while the row's own screen, the HUB or ONLINE, opens over the menu). */
-            if (m->on_extra && g_pad_moves == m->moves) continue;
-            if (m->on_extra) { m->on_extra = 0; m->last = -2; }
-        }
         if (c < 0 || c >= m->count || c == m->last) continue;
-        say_item(m, c, m->last != -1);
+        say_item(m, c, m->last >= 0);
         m->last = c;
     }
     shop_poll(0);
@@ -923,7 +813,6 @@ void menus_poll(void) {
 
 /* F5: say the highlighted item of any open menu. */
 int menus_read_current(void) {
-    if (im_row_on() || im_menu_on()) return im_read_all(1);
     if (g_wish >= 0) return wish_say(1);
     if (g_stage_last >= 0) return stage_say(1);
     if (g_bonus_last >= 0) return bonus_say(1);

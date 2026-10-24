@@ -14,7 +14,6 @@
  *   unwatch
  *   poke ADDR VALUE    write a big-endian 32-bit value (testing only)
  *   pad BUTTONS MS     hold controller buttons, e.g. "pad lb+a 200"
- *   imdump             log the text of the port's ImGui screens (last frame)
  */
 #include "access.h"
 #include <stdio.h>
@@ -286,8 +285,6 @@ static void run_cmd(char *line) {
         pad_pin((uint32_t)strtoul(a1, NULL, 16), (uint32_t)strtoul(a2, NULL, 0), a3[0] ? atoi(a3) : 5000);
     } else if (!strcmp(cmd, "pad")) {
         pad_inject(a1, a2[0] ? atoi(a2) : 150);
-    } else if (!strcmp(cmd, "imdump")) {
-        im_dump();
     } else if (!strcmp(cmd, "unwatch")) {
         set_dr_all(0, 0, 0);
         g_watch_addr = 0;
