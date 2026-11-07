@@ -20,6 +20,8 @@ foreach ($f in "out\Budokai3Access\Budokai3Access.dll", "data\text.tsv", "README
 }
 Copy-Item -LiteralPath (Join-Path $game "Budokai3Access\prism.dll") (Join-Path $stage "Budokai3Access")
 Copy-Item -LiteralPath (Join-Path $src "out\rexgpu-access.dll") (Join-Path $stage "Budokai3Access\loader\rexgpu-xenos.dll")
+# port 1.5.6+: the launcher copies this one into plugins\ (the port's own plugin loader)
+Copy-Item -LiteralPath (Join-Path $src "out\plugins\Budokai3Access.dll") (Join-Path $stage "Budokai3Access\loader\Budokai3Access.dll")
 Copy-Item -LiteralPath (Join-Path $src "third_party\minhook\LICENSE.txt") (Join-Path $stage "Budokai3Access\licenses\MinHook-LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $src "third_party\prism\LICENSE") (Join-Path $stage "Budokai3Access\licenses\Prism-LICENSE.txt")
 

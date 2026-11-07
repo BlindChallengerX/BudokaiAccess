@@ -4,7 +4,7 @@
 #include <windows.h>
 #include <stdint.h>
 
-#define MOD_VERSION "1.1.2-nightly"   /* nightly branch: port 1.5 support, may break; stable is main */
+#define MOD_VERSION "1.2.0-nightly"   /* nightly branch: port 1.5 support, may break; stable is main */
 
 extern wchar_t g_game_dir[MAX_PATH];   /* folder of dbz3.exe, with trailing backslash */
 extern wchar_t g_mod_dir[MAX_PATH];    /* g_game_dir + "Budokai3Access\" */
@@ -126,6 +126,12 @@ int im_row_on(void);
 int im_menu_on(void);
 int im_port_recent(DWORD ms);
 int im_any_text(void);
+int im_tactics_on(void);
+int roster_page(void);
+uint16_t pad_ui_take_edges(void);   /* port-screen buttons pressed since last call */
+const char *ship_char_name(int id, char *buf, size_t cap);
+void ship_poll(void);
+int ship_busy(void);      /* in Babidi's ship or the Budokai 2 main menu */      /* Babidi's Spaceship (ship.c) */    /* wheel page on screen (0 = first) */   /* Dragon Tactics open: no fight readers */
 const char *im_find(const char *prefix);
 void im_dialog_poll(void);   /* the port's ISO file dialog: bring it forward */
 int im_read_all(int interrupt);

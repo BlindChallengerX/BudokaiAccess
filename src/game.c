@@ -32,6 +32,7 @@ void game_poll(void) {
     text_poll();
     im_poll();
     im_dialog_poll();
+    ship_poll();
     menus_poll();
     fight_poll_all();
     du_poll();

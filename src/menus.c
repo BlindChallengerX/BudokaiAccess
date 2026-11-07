@@ -190,6 +190,7 @@ static void layout_poll(uint32_t w) {
         if (layout_on_screen(l) && (best < 0 || layout_len(l) > layout_len(best))) best = l;
     if (best != g_layout) { g_layout = best; g_lay_row = -1; }
     if (g_layout < 0) return;
+    if (g_layout == 1 && ship_busy()) { text_mute_pack(PAUSE_TEXTS); return; }   /* Babidi's ship skips the after-match menu on its own */
     int n = layout_len(g_layout);
     int row = g8(w + 9);
     if (row < 0 || row >= n || row == g_lay_row) return;
@@ -574,6 +575,14 @@ static const char *cs_name(int k, int id, char *buf, size_t cap) {
     return NULL;
 }
 
+/* for ship.c: a game character's name by character number */
+const char *ship_char_name(int id, char *buf, size_t cap) {
+    if (char_name(id, buf, cap)) return buf;
+    const char *r = roster_char_name(id);
+    if (r) { snprintf(buf, cap, "%s", r); return buf; }
+    return NULL;
+}
+
 static void cs_say(int k, int id, int interrupt) {
     char name[64];
     /* drawn this moment, not lingering from the slot just left (it is drawn every frame while shown) */
@@ -596,11 +605,11 @@ static void cs_poll(void) {
         if (k >= n || !guest_ok(w[k] + 4, 1)) { g_cs_last[k] = g_cs_seen[k] = -1; continue; }
         g_cs_work[k] = w[k];
         /* slot and wheel cell together: new cells share their host's slot */
-        int id = g8(w[k] + 4) | (roster_wheel_cell(w[k]) + 1) << 8;
+        int id = g8(w[k] + 4) | (roster_wheel_cell(w[k]) + 1) << 8 | roster_page() << 16;   /* a page change says the new one */
         if (id != g_cs_seen[k]) { g_cs_seen[k] = id; g_cs_since[k] = GetTickCount(); }
         /* speak once the cursor rests: the picture for locked characters follows it */
         if (id != g_cs_last[k] && GetTickCount() - g_cs_since[k] >= 150) {
-            cs_say(k, id & 0xff, g_cs_last[k] >= 0);
+            cs_say(k, id & 0xff, g_cs_last[k] >= 0 && (g_cs_last[k] >> 16) == (id >> 16));   /* after "Characters 2/2" */
             g_cs_last[k] = id;
         }
     }
@@ -889,6 +898,8 @@ static void trl_poll(void) {
 }
 
 void menus_poll(void) {
+    /* Babidi's ship runs over the main menu, which shows for a moment after each fight */
+    if (ship_busy()) { for (int i = 0; i < NMENUS; i++) k_menus[i].last = -1; return; }
     for (int i = 0; i < NMENUS; i++) {
         Menu *m = &k_menus[i];
         uint32_t w = menu_base(m);
@@ -940,7 +951,7 @@ void menus_poll(void) {
     sysq_poll();
     /* Words these readers speak themselves stay quiet in the text reader. */
     int yes_no = text_visible(PAUSE_TEXTS, 13) && text_visible(PAUSE_TEXTS, 14);   /* its reader says title and answer */
-    text_mute_pack(task_running("ESS MAIN") ? CAPSULE_NAMES : (g_pause_row >= 0 || g_layout >= 0 || yes_no) ? PAUSE_TEXTS : 0);
+    text_mute_pack(task_running("ESS MAIN") ? CAPSULE_NAMES : (g_pause_row >= 0 || g_layout >= 0 || yes_no || ship_busy()) ? PAUSE_TEXTS : 0);
     text_mute_all(g_skill_row >= 0 || g_strsel_last >= 0 || task_running("# MAIN MENU #"));   /* main menu: just the mode, not Goku's comments */   /* story select: its reader says name, level, stats */
     cs_poll();                 /* after the mute above: it mutes the name pictures itself */
     wish_poll();               /* after the mute above too */

@@ -1,5 +1,9 @@
 /*
- * Budokai3Access loader, as a wrapper around the port's graphics plugin.
+ * Budokai3Access loader. Built two ways (build.sh):
+ *  - out/plugins/Budokai3Access.dll (-DREX_MOD_PLUGIN): a code plugin for the
+ *    port's own plugin loader, port 1.5.6 and later (rex_mod_init below);
+ *  - out/rexgpu-access.dll: for older ports, a wrapper around the port's
+ *    graphics plugin, described next.
  *
  * dbz3.exe always loads its graphics plugin rexgpu-xenos.dll from the game
  * folder (the name is built into the executable). The installer renames the
@@ -15,11 +19,14 @@
 #include <windows.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <string.h>
 
 typedef void (*core_fn)(void);
 static wchar_t g_dir[MAX_PATH];
 static volatile LONG g_started;
+#ifndef REX_MOD_PLUGIN
 static void *p_create;                     /* rexgpu-xenos-original.dll!rex_gpu_create */
+#endif
 
 static FILETIME mtime(const wchar_t *p) {
     WIN32_FILE_ATTRIBUTE_DATA a; FILETIME z = { 0, 0 };
@@ -74,12 +81,48 @@ static DWORD WINAPI loader_thread(LPVOID unused) {
     return 0;
 }
 
-/* Called from rex_gpu_create (below) before the real plugin's factory. */
+/* Called from rex_gpu_create or rex_mod_init (below). */
 void access_start(void) {
     if (InterlockedExchange(&g_started, 1)) return;
     HANDLE h = CreateThread(NULL, 0, loader_thread, NULL, 0, NULL);
     if (h) CloseHandle(h);
 }
+
+#ifdef REX_MOD_PLUGIN
+/*
+ * Port 1.5.6 and later: the port's own plugin loader (issue #23). The game
+ * loads plugins\*.dll when dbz3_plugins = true and calls rex_mod_init once,
+ * before the game's first instruction. Built as
+ * out/plugins/Budokai3Access.dll; the port's graphics plugin is left alone.
+ */
+#include <stdint.h>
+typedef struct RexModHost {
+    uint32_t struct_size;
+    uint32_t api_version;
+    const char *port_version;
+    const char *region;
+    uint8_t *guest_base;
+    void *(*get_function)(uint32_t guest_address);
+    int (*set_function)(uint32_t guest_address, void *func);
+    void (*log)(const char *plugin, const char *message);
+} RexModHost;
+
+__declspec(dllexport) void rex_mod_init(const RexModHost *host) {
+    if (host && host->struct_size >= sizeof(RexModHost) && host->log) {
+        char msg[200];
+        snprintf(msg, sizeof msg, "Budokai 3 Access loader started (port %s, region %s, guest base %p)",
+                 host->port_version ? host->port_version : "?", host->region ? host->region : "?",
+                 (void *)host->guest_base);
+        host->log("Budokai3Access", msg);
+        /* The mod reads US addresses at the fixed guest base 0x100000000. */
+        if (host->region && strcmp(host->region, "us") != 0)
+            host->log("Budokai3Access", "this is not the US game; the mod only knows US addresses and may not work");
+        if ((uintptr_t)host->guest_base != 0x100000000ULL)
+            host->log("Budokai3Access", "unexpected guest memory base; the mod's self check will switch it off if needed");
+    }
+    access_start();
+}
+#else
 
 void *access_real_create(void) {
     if (!p_create) {
@@ -105,6 +148,7 @@ __asm__(
     "\tjz 1f\n"
     "\tjmp *%rax\n"
     "1:\txor %eax, %eax\n\tret\n");
+#endif
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
     (void)reserved;

@@ -46,6 +46,19 @@ static const struct { const char *mod, *name; } k_english[] = {
     { "cut_android19", "Android 19" },
 };
 
+/* Characters the port still lists as work in progress, said as "<name>, unfinished" on the
+ * wheel (checked 2026-11-07 against port 1.5.6, its changelog and each mod's personaje.toml):
+ *  - formas_donante (port known issue): some Ki + direction specials may not fire;
+ *  - no voice lines (voces = "ninguna"): silent intros and wins, battle cries only;
+ *  - battle cries from Heroes World Mission, which only has Japanese voices;
+ *  - Goku Black speaks with Goku's voice;
+ *  - Gogeta SS4 (rebuilt on 1.5.6): after one of his specials player 1 stops responding
+ *    (2026-11-07, user report; game still running, P1 input and pause cursor dead). */
+static const char *const k_unfinished[] = {
+    "imp_iw_gogeta_ss4", "imp_iw_goku_gt", "imp_iw_vegeta_gt", "vis_iw_vegeta_saiyan", "vis_sdbh_goku_black",
+    "cut_android19", "cut_dodoria", "cut_zarbon", "cut_burter", "cut_guldo", "cut_jeice",
+};
+
 static void load(void) {
     g_nnew = 0; g_ncaps = 0;
     wchar_t path[MAX_PATH];
@@ -78,6 +91,11 @@ static void load(void) {
                 folder[strcspn(folder, ")")] = 0;
                 for (size_t i = 0; i < sizeof k_english / sizeof k_english[0]; i++)
                     if (!strcmp(folder, k_english[i].mod)) snprintf(comment, sizeof comment, "%s", k_english[i].name);
+                for (size_t i = 0; i < sizeof k_unfinished / sizeof k_unfinished[0]; i++)
+                    if (!strcmp(folder, k_unfinished[i])) {
+                        size_t n = strlen(comment);
+                        snprintf(comment + n, sizeof comment - n, ", unfinished");
+                    }
             }
             if (c && block == CHAR && !c->name[0]) snprintf(c->name, sizeof c->name, "%s", comment);
             continue;
@@ -146,6 +164,69 @@ int roster_wheel_cell(uint32_t work) {
     return k < (uint32_t)n && k < 64 ? (int)k : -1;
 }
 
+/* Wheel pages (port 1.5.6): with more than 24 added characters, those with logical IDs
+ * (10000 and up) share the cells left after the fixed ones (24 minus fixed), a page at a
+ * time: page p holds logical characters (p * cells + i) mod count, in roster order, so the
+ * last page wraps round to the first ones (roster_ext.cpp; the port log's "id logico N ->
+ * proxy guest G (pagina P)"). The wheel is laid out again for each page, each character
+ * after its own tras_casilla slot (checked in memory on page 2: Roshi after Krillin, Goku
+ * Black gone from after Goku). The page on screen is the port's "Characters N/M" line. */
+#define LOGICAL_ID 10000
+static int text_page(void) {
+    const char *t = im_find("Characters ");
+    int p = 1, n = 1;
+    if (t && sscanf(t, "Characters %d/%d", &p, &n) == 2 && p >= 1 && p <= n) return p - 1;
+    return -1;
+}
+int roster_page(void) { int p = text_page(); return p < 0 ? 0 : p; }
+
+static int on_page(int j, int page) {
+    if (g_new[j].id < LOGICAL_ID) return 1;
+    int fixed = 0, nlog = 0, idx = -1;
+    for (int i = 0; i < g_nnew; i++) {
+        if (!g_new[i].cell) continue;
+        if (g_new[i].id < LOGICAL_ID) fixed++;
+        else { if (i == j) idx = nlog; nlog++; }
+    }
+    int per = 24 - fixed;
+    if (idx < 0 || per <= 0) return 0;
+    if (nlog <= per) return 1;
+    for (int s = 0; s < per; s++) if ((page * per + s) % nlog == idx) return 1;
+    return 0;
+}
+
+static int host_slot(const NewChar *c);
+static int after_slot(const NewChar *c);
+
+/* How many new cells page `page` expects that the wheel in memory doesn't have (0 = fits). */
+static int page_misses(uint32_t d, int n, int page) {
+    int pending[MAXNEW], np = 0, pi = 0, miss = 0;
+    for (int i = 0; i < n; i++) {
+        int slot = (int8_t)g8(d + 44 + 28 * (uint32_t)i + 2);
+        if (pi < np && slot == host_slot(&g_new[pending[pi]])) { pi++; continue; }
+        miss += np - pi;
+        np = pi = 0;
+        for (int j = 0; j < g_nnew; j++)
+            if (g_new[j].cell && after_slot(&g_new[j]) == slot && on_page(j, page)) pending[np++] = j;
+    }
+    return miss + np - pi;
+}
+
+/* The page the wheel shows: the port's "Characters N/M" line, else (it goes away after a
+ * fight while the wheel stays on its page) the page whose layout fits the wheel. */
+static int wheel_page(uint32_t d, int n) {
+    int p = text_page();
+    if (p >= 0) return p;
+    int fixed = 0, nlog = 0, best = 0, best_miss = 1 << 30;
+    for (int i = 0; i < g_nnew; i++) if (g_new[i].cell) { if (g_new[i].id < LOGICAL_ID) fixed++; else nlog++; }
+    int per = 24 - fixed, pages = per > 0 && nlog > per ? (nlog + per - 1) / per : 1;
+    for (int q = 0; q < pages; q++) {
+        int m = page_misses(d, n, q);
+        if (m < best_miss) { best_miss = m; best = q; }
+    }
+    return best;
+}
+
 /* If the cursor of this select state is on a new cell, the character's name; else NULL. */
 const char *roster_cell_name(uint32_t work) {
     ensure();
@@ -153,6 +234,7 @@ const char *roster_cell_name(uint32_t work) {
     int k = roster_wheel_cell(work);
     if (k < 0) return NULL;
     uint32_t d = g32(g32(work + 40) + 48);
+    int page = wheel_page(d, (int8_t)g8(d + 12));
     /* Walk the wheel: each original cell is followed by the new cells that come after its slot. */
     int pending[MAXNEW], np = 0, pi = 0;
     for (int i = 0; i <= k; i++) {
@@ -165,7 +247,7 @@ const char *roster_cell_name(uint32_t work) {
         if (i == k) return NULL;          /* an original cell */
         np = pi = 0;
         for (int j = 0; j < g_nnew; j++)
-            if (g_new[j].cell && after_slot(&g_new[j]) == slot) pending[np++] = j;
+            if (g_new[j].cell && after_slot(&g_new[j]) == slot && on_page(j, page)) pending[np++] = j;
     }
     return NULL;
 }

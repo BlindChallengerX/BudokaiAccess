@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include "MinHook.h"
 
-#define TESTED_PORT "1.5.5.1"
+#define TESTED_PORT "1.5.6"
 
 volatile LONG g_bind_calls, g_bind_sane;   /* counted by the texture hook (text.c) */
 static int g_checked, g_failed;
@@ -46,6 +46,7 @@ void selfcheck_log_versions(void) {
     file_version(L"dbz3.exe", g_port, sizeof g_port);
     file_version(L"rexruntime.dll", rt, sizeof rt);
     file_version(L"rexgpu-xenos-original.dll", gpu, sizeof gpu);
+    if (!strcmp(gpu, "unknown")) file_version(L"rexgpu-xenos.dll", gpu, sizeof gpu);   /* 1.5.6+: not wrapped */
     log_line("port: dbz3.exe %s, rexruntime %s, graphics plugin %s (tested with %s)", g_port, rt, gpu, TESTED_PORT);
 }
 

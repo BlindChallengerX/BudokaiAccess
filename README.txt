@@ -1,4 +1,4 @@
-Budokai 3 Access 1.1.2 nightly
+Budokai 3 Access 1.2.0 nightly
 
 A screen reader mod for Dragon Ball Z Budokai 3 on PC. It speaks through
 your screen reader (NVDA, JAWS and others), or the Windows voice if none is
@@ -16,8 +16,9 @@ loaded" when the game starts.
 WHAT YOU NEED
 
 - The Budokai 3 HD PC port by NovaPowers. This nightly was tested with
-  version 1.5.5.1:
-  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.5.5.1
+  version 1.5.6:
+  https://github.com/novapowers0/DBZ-Budokai-3-HD-Collection/releases/tag/v1.5.6
+  Older 1.5 versions still work, the old way (see HOW THE MOD LOADS).
 - Your own copy of the game, USA version, set up as the port explains.
   Get the game running first, then add this mod. SETUP-GUIDE.txt on the
   mod's GitHub page explains the whole setup in English.
@@ -25,7 +26,7 @@ WHAT YOU NEED
 
 INSTALL
 
-1. Unzip Budokai3Access-1.1.2-nightly.zip into the game folder, the folder
+1. Unzip Budokai3Access-1.2.0-nightly.zip into the game folder, the folder
    with dbz3.exe. It replaces the stable build if you had it there.
 2. Run "Play Budokai 3 Access.exe" from that folder.
 
@@ -35,6 +36,74 @@ If Windows says "Windows protected your PC", choose "More info", then
 That's it. Always start the game with "Play Budokai 3 Access.exe". The game
 starts straight away and you should hear "Budokai 3 Access nightly loaded".
 (The port's launcher is skipped. See THE PORT'S SETTINGS below.)
+
+
+NEW IN 1.2.0 (PORT 1.5.6)
+
+- The mod now loads through the port's own plugin support, which
+  NovaPowers added for this mod. It no longer replaces any of the port's
+  files. "Play Budokai 3 Access.exe" puts the mod in the plugins folder and
+  turns the port's "Code plugins" setting on. See HOW THE MOD LOADS.
+- Dragon Tactics (HUB, page 2): its menu, Options ("Prep timer: Off, 1 of
+  5"; left and right say the new value) and How to play are read. The board
+  itself is not read yet, so it can't be played by ear. The fight sounds
+  and fight messages stay quiet while Dragon Tactics is open (it runs a
+  hidden fight behind its board).
+- Online's new screen: "1 VS 1" or "TAG TEAM 2 VS 2", then Create a room,
+  Join with a code, Find a match and Advanced, each with its description.
+- Stage select: the music line ("Music: Original"), changed with LB and RB.
+- On the character wheel the port now shows "Normal" or "Custom" in a box.
+  The mod says it once and no longer mistakes it for a menu, so F2 reads
+  the game's screen there again.
+
+- Extra fighters the port still lists as work in progress are said with
+  "unfinished" after their name on the wheel:
+  Gogeta SS4: after one of his special moves he can stop responding
+    (the game keeps running, but you can't move or use the pause menu).
+  Goku GT, Vegeta GT, Vegeta (Saiyan Saga) and Goku Black: some Ki +
+    direction specials may not come out (a known port issue). Goku Black
+    also speaks with Goku's voice.
+  Android 19, Dodoria and Zarbon: battle cries only, no voice lines.
+  Burter, Guldo and Jeice: no voice lines, and their battle cries come
+    from Super Dragon Ball Heroes World Mission, which is in Japanese.
+  English voices for the Ginyu Force, Zarbon, Dodoria and Android 19 exist
+  in Budokai Tenkaichi 3. The port can take them from your own copy of
+  that disc, but these mods don't do it yet.
+- If you installed the Infinite World fighters (Gogeta SS4, Goku GT,
+  Vegeta GT, Baby, Pan, Pikkon, Super 17, Great Saiyaman 2) before port
+  1.5.6, rebuild them: some of their ultimates crash the game in the old
+  build. Port 1.5.6 makes them again from your Infinite World disc with
+  their own moves, ultimates and English voices.
+
+- Babidi's Spaceship (HUB > Gateway, needs your Budokai 2 disc) is read:
+  how many players; the floor list with each floor's rules ("Floor 3,
+  hits: 99 seconds to land as many hits as you can. 4 Kili for each
+  hit."); your fighter and the opponent on the wheel (LB, RB change page);
+  Normal, Custom, Edit Skills; the stage; the fight; and afterwards the
+  result ("Result: 34 seconds, 68 Kili"), the ship bar and any prize
+  ("Prize: Dabura, new"). Leaving the ship goes to the Budokai 2 main menu,
+  which is read too (Dragon World, Duel, World Tournament, Practice, Edit
+  Skills, Options, Babidi's Spaceship). The ship's Babidi speech bubbles
+  and the prize cards' text are pictures and are not read.
+- The Dragon World board itself (Budokai 2's board game) is not read yet.
+
+Known limits in 1.2.0:
+- Port bug: on Dragon Tactics' start menu, A (Space on the keyboard) often
+  does nothing. The press also ends the port's camera scene behind the
+  menu, and the menu misses it. Options usually opens; Play and How to
+  play mostly don't. Reported to the port's developer.
+- More than 24 extra fighters puts the wheel into pages: LB and RB say
+  "Characters 2/2" and then the fighter under the cursor. The page's
+  fighters take turns in the same spots on the wheel, and the mod names
+  whoever is in the spot on the page you are on.
+- Starting form (LT, RT on the wheel): start the fight already
+  transformed. The mod says "Start in form 1, ki 2", or, when the
+  transformation's capsule isn't in the skill list you will pick, "Form 4
+  not available, you start in normal form. Put Super Saiyan 3 in this skill
+  list to use it". Pick Custom and put that capsule in to use the form.
+- Port bug: after the first fight, the wheel's page line and form picker
+  disappear (LB, RB and LT, RT stop working there) until the game is
+  restarted.
 
 
 NEW IN THE NIGHTLY (PORT 1.5)
@@ -47,10 +116,10 @@ screen, F5 the highlighted row.
 - Main menu: HUB is the 8th row (up from Dragon Universe, or down from
   the last row).
 - HUB: every mode by name with its description, page 1 and 2 (LB, RB).
-- Dueling: ONLINE is the 5th row (down from Computer versus computer). Its
-  screen says which of the 4 steps you are on ("Step 1 of 4, HOST OR
-  JOIN"), and reads the room code, port and delay rows, the connection
-  status and the messages.
+- Dueling: ONLINE is the 5th row (down from Computer versus computer). On
+  ports before 1.5.6 its screen says which of the 4 steps you are on
+  ("Step 1 of 4, HOST OR JOIN"), and reads the room code, port and delay
+  rows, the connection status and the messages.
 - Tag Team: the 1P versus computer rows, team size and points, team
   picking on the wheel, and the partner cards in the fight (including KO).
 - Tower, Survival, Kumite, Mission 100 and Gateway: their lists and
@@ -70,9 +139,11 @@ screen, F5 the highlighted row.
   name in English.
 
 Known limits:
-- Online play probably fails between a player with this mod and one
-  without it: the port checks that both players have the same program
-  files, and the mod's loader is one of them. Not solved yet.
+- Online play: on ports before 1.5.6 it probably fails between a player
+  with this mod and one without it, because the port checks that both
+  players have the same program files and the mod's old loader is one of
+  them. From 1.5.6 the mod leaves the port's files alone, so this should
+  be solved, but it is not tested yet (needs two PCs).
 - The Budokai 2 board and the Infinite World map open and their menus
   read, but the board itself is not read yet, so they can't be played by
   ear.
@@ -141,6 +212,21 @@ dbz3_input_backend = "sdl"
 If you want the old Xbox-only mode back, choose XInput as the controller
 backend in the port's launcher (see THE PORT'S SETTINGS below for how to get
 the launcher back); the mod will not switch it again.
+
+
+HOW THE MOD LOADS
+
+Port 1.5.6 and later: the mod is a code plugin, plugins\Budokai3Access.dll
+in the game folder, and the port loads it when its "Code plugins" setting
+is on (dbz3_plugins = true in dbz3_user.toml). "Play Budokai 3 Access.exe"
+copies the plugin there and turns the setting on every time you start the
+game with it, so nothing else is needed. If an earlier version of the mod
+had replaced the port's rexgpu-xenos.dll, it puts the port's file back.
+
+Older ports: the mod's loader takes the place of the port's graphics
+plugin, rexgpu-xenos.dll (the port's own file is kept as
+rexgpu-xenos-original.dll). Windows Defender has wrongly flagged that
+loader before; the plugin way avoids it.
 
 
 THE PORT'S SETTINGS
@@ -462,16 +548,22 @@ The music is not included here and the mod works the same without it.
 
 REMOVING THE MOD
 
-In the game folder, delete rexgpu-xenos.dll, then rename
-rexgpu-xenos-original.dll to rexgpu-xenos.dll. You can also delete the
-Budokai3Access folder and "Play Budokai 3 Access.exe".
+Port 1.5.6 and later: in the game folder, delete plugins\Budokai3Access.dll.
+Older ports: delete rexgpu-xenos.dll, then rename
+rexgpu-xenos-original.dll to rexgpu-xenos.dll.
+You can also delete the Budokai3Access folder and "Play Budokai 3
+Access.exe".
 
 
 IF SOMETHING GOES WRONG
 
-Port updates put the port's own rexgpu-xenos.dll back. That is expected:
-"Play Budokai 3 Access.exe" puts the mod back each time you start the game with
-it.
+If you start dbz3.exe directly, or switch off "Code plugins" in the port's
+launcher, the mod does not load. Start the game with "Play Budokai 3
+Access.exe" and it is turned back on.
+
+On ports before 1.5.6, port updates put the port's own rexgpu-xenos.dll
+back. That is expected: "Play Budokai 3 Access.exe" puts the mod back each
+time you start the game with it.
 
 If a port update changes things the mod relies on, the mod switches itself
 off and says so, and the game keeps running without it. Then look for a mod

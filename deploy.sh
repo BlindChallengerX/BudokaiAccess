@@ -10,5 +10,6 @@ cp out/Budokai3Access/Budokai3Access.dll "$GAME/Budokai3Access/Budokai3Access.dl
 # (and does so again after any port update), so the build uses it too.
 mkdir -p "$GAME/Budokai3Access/loader"
 cp out/rexgpu-access.dll "$GAME/Budokai3Access/loader/rexgpu-xenos.dll"
+cp out/plugins/Budokai3Access.dll "$GAME/Budokai3Access/loader/Budokai3Access.dll"
 cp "out/Play Budokai 3 Access.exe" "$GAME/Play Budokai 3 Access.exe"
 "$GAME/Play Budokai 3 Access.exe" --repair || echo "launcher repair failed; see $GAME/Budokai3Access/launch.log"

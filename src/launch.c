@@ -2,10 +2,16 @@
  * "Play Budokai 3 Access.exe": checks the mod is installed, repairs it, starts the
  * game.
  *
- * The mod's loader replaces the port's graphics plugin rexgpu-xenos.dll (the
- * port's own file is kept as rexgpu-xenos-original.dll). A port update, or
- * the launcher's "Repair install", puts the port's file back and the mod
- * would stop loading. Every time this program runs it:
+ * Port 1.5.6 and later load code plugins themselves (plugins\*.dll, when
+ * dbz3_plugins = true). There this program undoes the old wrap described
+ * below if an earlier version left it, copies
+ * Budokai3Access\loader\Budokai3Access.dll to plugins\ and sets
+ * dbz3_plugins = true on every run (the port's launcher can switch it off).
+ *
+ * Older ports: the mod's loader replaces the port's graphics plugin
+ * rexgpu-xenos.dll (the port's own file is kept as rexgpu-xenos-original.dll).
+ * A port update, or the launcher's "Repair install", puts the port's file
+ * back and the mod would stop loading. Every time this program runs it:
  *   1. looks at rexgpu-xenos.dll: if it is not ours (no "Budokai 3 Access"
  *      product name), it is a new port file, so it becomes the original;
  *   2. puts the current loader (Budokai3Access\loader\rexgpu-xenos.dll) in place
@@ -76,7 +82,59 @@ static int same_file(const wchar_t *a, const wchar_t *b) {
     return same;
 }
 
-/* Returns 1 when the mod's loader is in place. */
+/* dbz3.exe file version as one number (1.5.6.0 -> 0x0001000500060000). */
+static unsigned long long exe_version(void) {
+    wchar_t path[MAX_PATH];
+    swprintf(path, MAX_PATH, L"%lsdbz3.exe", g_dir);
+    DWORD h = 0, n = GetFileVersionInfoSizeW(path, &h);
+    unsigned long long v = 0;
+    if (!n) return 0;
+    void *buf = HeapAlloc(GetProcessHeap(), 0, n);
+    VS_FIXEDFILEINFO *fi; UINT len;
+    if (buf && GetFileVersionInfoW(path, 0, n, buf) && VerQueryValueW(buf, L"\\", (void **)&fi, &len) && fi)
+        v = ((unsigned long long)fi->dwFileVersionMS << 32) | fi->dwFileVersionLS;
+    if (buf) HeapFree(GetProcessHeap(), 0, buf);
+    return v;
+}
+#define PORT_WITH_PLUGINS 0x0001000500060000ULL   /* 1.5.6 */
+
+static void toml_set(const char *key, const char *value);
+
+/* Port 1.5.6+: the port's own plugin loader. Returns 1 when the plugin is in place. */
+static int repair_plugin(void) {
+    wchar_t gpu[MAX_PATH], orig[MAX_PATH], ours[MAX_PATH], dir[MAX_PATH], dst[MAX_PATH];
+    swprintf(gpu, MAX_PATH, L"%lsrexgpu-xenos.dll", g_dir);
+    swprintf(orig, MAX_PATH, L"%lsrexgpu-xenos-original.dll", g_dir);
+    swprintf(ours, MAX_PATH, L"%lsBudokai3Access\\loader\\Budokai3Access.dll", g_dir);
+    swprintf(dir, MAX_PATH, L"%lsplugins", g_dir);
+    swprintf(dst, MAX_PATH, L"%lsplugins\\Budokai3Access.dll", g_dir);
+    if (!exists(ours)) { fail(L"The Budokai 3 Access loader is missing (Budokai3Access\\loader\\Budokai3Access.dll). Please reinstall the mod."); return 0; }
+    /* Undo the old graphics plugin wrap. */
+    if (exists(gpu) && is_ours(gpu)) {
+        if (!exists(orig)) {
+            fail(L"The game's graphics plugin is missing (rexgpu-xenos.dll). Use Repair install in the game's launcher, then start Budokai 3 Access again.");
+            return 0;
+        }
+        if (!MoveFileExW(orig, gpu, MOVEFILE_REPLACE_EXISTING)) {
+            fail(L"Could not set up Budokai 3 Access: the game's graphics plugin is in use. Close the game and try again.");
+            return 0;
+        }
+        logw(L"put the port's graphics plugin back (no wrapper needed from port 1.5.6)");
+    } else if (exists(orig)) {
+        DeleteFileW(orig);                        /* left over from before a port update */
+        logw(L"removed the old rexgpu-xenos-original.dll");
+    }
+    CreateDirectoryW(dir, NULL);
+    if (!exists(dst) || !same_file(dst, ours)) {
+        if (CopyFileW(ours, dst, FALSE)) logw(L"installed plugins\\Budokai3Access.dll");
+        else if (exists(dst)) logw(L"plugin in use; keeping the installed one");
+        else { fail(L"Could not install the Budokai 3 Access plugin in the game's plugins folder."); return 0; }
+    }
+    toml_set("dbz3_plugins", "true");
+    return 1;
+}
+
+/* Older ports: the graphics plugin wrapper. Returns 1 when the mod's loader is in place. */
 static int repair(void) {
     wchar_t plugin[MAX_PATH], orig[MAX_PATH], ours[MAX_PATH];
     swprintf(plugin, MAX_PATH, L"%lsrexgpu-xenos.dll", g_dir);
@@ -250,7 +308,11 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     wchar_t exe[MAX_PATH];
     swprintf(exe, MAX_PATH, L"%lsdbz3.exe", g_dir);
     if (!exists(exe)) { fail(L"Put Play Budokai 3 Access.exe in the game folder, next to dbz3.exe."); return 1; }
-    int ok = repair();
+    unsigned long long ver = exe_version();
+    int plugins = ver >= PORT_WITH_PLUGINS;
+    logw(L"port %u.%u.%u.%u: %ls", (unsigned)(ver >> 48), (unsigned)(ver >> 32) & 0xffff, (unsigned)(ver >> 16) & 0xffff,
+         (unsigned)ver & 0xffff, plugins ? L"port plugin loader" : L"graphics plugin wrapper");
+    int ok = plugins ? repair_plugin() : repair();
     port_settings();
     controller_backend();
     if (repair_only) return ok ? 0 : 1;

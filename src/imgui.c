@@ -177,6 +177,11 @@ static int kind_of(uint32_t col) {
     if (col == 0xffe7d202u) return K_ROW_SEL;   /* IM_COL32(2, 210, 231, 255) */
     if (col == 0xffc3b228u) return K_ROW;       /* IM_COL32(40, 178, 195, 255) */
     if (col == 0xebac9e96u) return K_ROW_OFF;   /* IM_COL32(150, 158, 172, 235) */
+    /* style::MenuTextB3 (1.5.6: Dragon Tactics, Hero Mode panels): top half yellow when
+     * highlighted, white otherwise, grey when off; drawn over a dark outline. */
+    if (col == 0xff40e8ffu) return K_ROW_SEL;   /* IM_COL32(255, 232, 64, 255) */
+    if (col == 0xffffffffu) return K_ROW;
+    if (col == 0xffbcb0aau) return K_ROW_OFF;   /* IM_COL32(170, 176, 188, 255) */
     return K_TEXT;
 }
 
@@ -276,6 +281,7 @@ static const struct { const char *start, *name, *also; } k_rows[] = {
     { "Needs your copy of Dragon Ball Z Budokai", "Legend of Hercule, not available", "Press A and pick its ISO" },
     { "A hundred missions by saga", "Mission 100" },
     { "Your own hero and story", "Hero Mode" },
+    { "Auto chess with the Budokai 3 fighters", "Dragon Tactics" },   /* 1.5.6 */
     /* Tag Team's first screen */
     { "Your team against the computer's", "1 P versus computer" },
     { "Two players, each picks a team", "1 P versus 2 P" },
@@ -286,7 +292,8 @@ static const struct { const char *start, *name, *also; } k_rows[] = {
  * ("Rank: Kyu 5 (0 PE)") and button legends (LT Previous, RT Next...). Said
  * the first time, then at most every 30 seconds (F2 reads them any time).
  * An entry ending in a space is a prefix. */
-static const char *k_tails[] = { "Rank: ", "Previous", "Next", "Close", "Don't show again", "Finish", "BETA", "EXPERIMENTAL", "Preparing the " };
+static const char *k_tails[] = { "Rank: ", "Previous", "Next", "Close", "Don't show again", "Finish", "BETA", "EXPERIMENTAL", "Preparing the ",
+                                 "Select", "Confirm", "Back" };   /* the ship's button legend */
 #define NTAILS (sizeof k_tails / sizeof k_tails[0])
 static DWORD g_tail_said[NTAILS];
 
@@ -301,6 +308,45 @@ static int tail_quiet(const char *line) {
         return 0;
     }
     return 0;
+}
+
+/* 1.5.6 character select form picker (LT/RT, tagteam_panel.cpp DrawFormPick): start the
+ * fight already transformed. Its chip reads "Normal", "Form 2 - Ki 2.0" (form 2, its ki
+ * cost) or "Form 5 > 0 - Missing capsule 31" (form 5 asked for, the fight starts in form 0
+ * because that transformation capsule is not in the chosen skill list; also "Not at
+ * start", "No table", "No model"). Said in plain words, the capsule by name. */
+extern const char *capsule_name(int id);
+static int form_chip(const char *t, char *out, size_t cap) {
+    if (!strcmp(t, "Normal")) { snprintf(out, cap, "Start in normal form"); return 1; }
+    int want = 0, got = -1, n = 0;
+    if (sscanf(t, "Form %d%n", &want, &n) != 1) return 0;
+    const char *r = t + n;
+    if (sscanf(r, " > %d%n", &got, &n) == 1) r += n;
+    const char *info = strstr(r, " - ");
+    info = info ? info + 3 : "";
+    char start[80];
+    if (got < 0) snprintf(start, sizeof start, "Start in form %d", want);
+    else if (got == 0) snprintf(start, sizeof start, "Form %d not available, you start in normal form", want);
+    else snprintf(start, sizeof start, "Form %d not available, you start in form %d", want, got);
+    int c = 0; float ki = 0;
+    if (sscanf(info, "Missing capsule %d", &c) == 1) {
+        const char *name = capsule_name(c);
+        if (name) snprintf(out, cap, "%s. Put %s in this skill list to use it", start, name);
+        else snprintf(out, cap, "%s. Its transformation capsule (number %d) is not in this skill list", start, c);
+    } else if (sscanf(info, "Ki %f", &ki) == 1) snprintf(out, cap, "%s, ki %g", start, ki);
+    else if (!strcmp(info, "Not at start")) snprintf(out, cap, "%s. This form can't be used at the start", start);
+    else if (info[0]) snprintf(out, cap, "%s. %s", start, info);
+    else snprintf(out, cap, "%s", start);
+    return 1;
+}
+
+/* "<  10 s  >" (an option's value with its arrows) -> "10 s" */
+static int is_value(const char *s) { return s[0] == '<' && s[1] == ' '; }
+static void clean_value(const char *s, char *out, size_t cap) {
+    while (*s == '<' || *s == ' ') s++;
+    snprintf(out, cap, "%s", s);
+    size_t n = strlen(out);
+    while (n && (out[n - 1] == '>' || out[n - 1] == ' ')) out[--n] = 0;
 }
 
 static const char *row_name(const char *text) {
@@ -342,6 +388,22 @@ int im_port_recent(DWORD ms) {
 }
 
 void im_mute(int on) { g_im_mute = on; }
+
+/* Dragon Tactics (port 1.5.6) runs a hidden World Tournament fight behind its board:
+ * the fight readers stay quiet while it is open. On from its title; off once its
+ * screens are gone (the HUB's row descriptions are back, or no port text for 20 s:
+ * it shows a black screen for a few seconds between loading and its menu). */
+static int g_tactics;
+static DWORD g_any_text_at;
+int im_tactics_on(void) { return g_ready && g_tactics; }
+static void tactics_track(const Line *l, int nl, DWORD now) {
+    int title = 0;
+    for (int k = 0; k < nl; k++)
+        if (!strncmp(l[k].s, "Dragon Tactics", 14) && l[k].size >= 30) title = 1;
+    if (nl) g_any_text_at = now;
+    if (title && !g_tactics) { g_tactics = 1; log_line("imgui: Dragon Tactics open"); }
+    else if (g_tactics && (now - g_row_seen < 100 || now - g_any_text_at > 20000)) { g_tactics = 0; log_line("imgui: Dragon Tactics closed"); }
+}
 
 /* Safety net: a highlighted row said more than 3 times in 2 seconds goes quiet for 10 seconds
  * (two texts fighting over one spot would otherwise repeat every frame). */
@@ -442,9 +504,17 @@ void im_poll(void) {
         int nl = build_lines(f, n, l, IM_MAX);
         const char *desc_row = NULL;
         for (int k = 0; k < nl; k++) if (row_name(l[k].s)) { g_row_seen = now; desc_row = row_name(l[k].s); }
+        tactics_track(l, nl, now);
         /* Highlighted rows (a screen can have more than one: Tag Team's team slot and form
          * picker): say each one that changes, with its place among the rows of its list. */
         int said = 0;
+        static int fresh[IM_MAX];                 /* highlighted rows new in this frame */
+        for (int k = 0; k < nl; k++) {
+            fresh[k] = 0;
+            if (l[k].kind != K_ROW_SEL) continue;
+            fresh[k] = 1;
+            for (int i = 0; i < NSEL && fresh[k]; i++) fresh[k] = !(g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s));
+        }
         for (int k = 0; k < nl; k++)              /* first mark the ones still up, so two drawn at one spot keep each other */
             if (l[k].kind == K_ROW_SEL)
                 for (int i = 0; i < NSEL; i++) if (g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s)) g_sels[i].seen = now;
@@ -452,7 +522,12 @@ void im_poll(void) {
             if (l[k].kind != K_ROW_SEL) continue;
             /* HUB page 2: Hero Mode flashes highlighted while the page turns to another row */
             if (desc_row && is_row_label(l[k].s) && _stricmp(desc_row, l[k].s)) continue;
-            g_sel_seen = now;
+            /* A port menu has other rows or a highlight stripe. A lone highlighted label is not
+             * one (1.5.6 draws the list type, "Normal" / "Custom", over the character wheel). */
+            int menu = l[k].stripe;
+            for (int j = 0; j < nl && !menu; j++)
+                menu = j != k && l[j].kind != K_TEXT && l[j].list == l[k].list && l[j].size == l[k].size;
+            if (menu) g_sel_seen = now;
             int known = 0;
             for (int i = 0; i < NSEL && !known; i++) known = g_sels[i].s[0] && !strcmp(g_sels[i].s, l[k].s);
             if (known) continue;
@@ -468,22 +543,54 @@ void im_poll(void) {
             snprintf(g_sels[slot].s, sizeof g_sels[slot].s, "%s", l[k].s);
             g_sels[slot].list = l[k].list; g_sels[slot].x = cx; g_sels[slot].y = l[k].y; g_sels[slot].seen = now;
             if (row_flood(l[k].s, now)) continue;
+            /* Option rows (1.5.6 Dragon Tactics options): the name and "<  value  >" are two
+             * texts on one row. Moving to the row says "name: value"; changing the value
+             * says the new value alone. */
+            int mate = -1;
+            for (int j = 0; j < nl && mate < 0; j++)
+                if (j != k && l[j].kind == K_ROW_SEL && l[j].list == l[k].list && fabsf(l[j].y - l[k].y) < 3 &&
+                    is_value(l[j].s) != is_value(l[k].s)) mate = j;
+            char val[IM_TEXT];
+            if (mate >= 0 && is_value(l[k].s)) {
+                if (fresh[mate] || g_im_mute) continue;           /* said with its name */
+                clean_value(l[k].s, val, sizeof val);
+                speakf(!said, "%s", val);
+                said++;
+                log_line("imgui value: %s", val);
+                continue;
+            }
             snprintf(g_sel, sizeof g_sel, "%s", l[k].s);
             g_sel_said = now;
             int nrows = 1, pos = 0, others = 0;
             for (int j = 0; j < nl; j++)
-                if (j != k && (l[j].kind == K_ROW || l[j].kind == K_ROW_OFF) && l[j].list == l[k].list && l[j].size == l[k].size) {
+                if (j != k && (l[j].kind == K_ROW || l[j].kind == K_ROW_OFF) && l[j].list == l[k].list && l[j].size == l[k].size &&
+                    !is_value(l[j].s) && fabsf(l[j].y - l[k].y) >= 3) {
                     nrows++; others++;
                     if (l[j].y < l[k].y - 1) pos++;
                 }
-            char say[IM_TEXT];
-            snprintf(say, sizeof say, "%s", l[k].s);
+            char say[IM_TEXT * 2];
+            if (mate >= 0) {
+                clean_value(l[mate].s, val, sizeof val);
+                snprintf(say, sizeof say, "%s: %s", l[k].s, val);
+            } else snprintf(say, sizeof say, "%s", l[k].s);
+            if (!others && mate < 0) {                    /* the form picker chip */
+                char t[IM_TEXT * 2];
+                if (form_chip(say, t, sizeof t)) snprintf(say, sizeof say, "%s", t);
+            }
+            if (!strncmp(say, "MUSIC  ", 7)) {             /* 1.5.6 stage select: "MUSIC  Original", LB/RB change it */
+                char t[IM_TEXT * 2];
+                snprintf(t, sizeof t, "Music: %s", say + 7);
+                snprintf(say, sizeof say, "%s", t);
+            }
             char *dash = strstr(say, "- - -");             /* ONLINE's empty room code */
             if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
             if (g_im_mute) continue;
             const char *off = l[k].off ? ", unavailable" : "";
             /* ONLINE's progress list: "1 HOST OR JOIN" ... "4 FIGHT" */
             int step = say[0] >= '1' && say[0] <= '9' && say[1] == ' ' && say[0] - '0' == pos + 1;
+            for (int j = 0; j < nl && step; j++)          /* every row numbered (1.5.6's "1 VS 1" is not a step) */
+                if ((l[j].kind == K_ROW || l[j].kind == K_ROW_OFF) && l[j].list == l[k].list && l[j].size == l[k].size)
+                    step = l[j].s[0] >= '1' && l[j].s[0] <= '9' && l[j].s[1] == ' ';
             if (others && step) speakf(!said, "Step %d of %d, %s", pos + 1, nrows, say + 2);
             else if (others) speakf(!said, "%s%s, %d of %d", say, off, pos + 1, nrows);   /* the first change cuts off older speech */
             else speakf(!said, "%s%s", say, off);

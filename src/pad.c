@@ -89,13 +89,22 @@ void pad_inject(const char *names, int ms) {
 typedef uint32_t (*ui_state_fn)(void *self, uint32_t user, void *state);
 static ui_state_fn o_ui_state;
 static void *g_ui_state_target;
+static volatile LONG g_ui_edges;          /* buttons newly pressed on port screens, taken by ship.c */
+uint16_t pad_ui_take_edges(void) { return (uint16_t)InterlockedExchange(&g_ui_edges, 0); }
+
 static uint32_t h_ui_state(void *self, uint32_t user, void *state) {
     InterlockedIncrement(&g_inflight);
     uint32_t r = o_ui_state(self, user, state);
     if (user == 0 && state && r == 0) {
         static uint16_t prev;
         uint16_t b = _byteswap_ushort(*(uint16_t *)((uint8_t *)state + 4));
+        /* the left stick counts as the D-pad (port screens treat it so) */
+        int16_t lx = (int16_t)_byteswap_ushort(*(uint16_t *)((uint8_t *)state + 8));
+        int16_t ly = (int16_t)_byteswap_ushort(*(uint16_t *)((uint8_t *)state + 10));
+        if (ly > 16000) b |= 1; else if (ly < -16000) b |= 2;
+        if (lx < -16000) b |= 4; else if (lx > 16000) b |= 8;
         if ((b & 3) && !(prev & 3)) InterlockedIncrement(&g_pad_moves);
+        if (b & ~prev) InterlockedOr(&g_ui_edges, (LONG)(b & ~prev));
         prev = b;
     }
     if (user == 0 && state && g_inject && GetTickCount() < g_inject_until) {
