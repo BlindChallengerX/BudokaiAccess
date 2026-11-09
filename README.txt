@@ -102,9 +102,13 @@ NEW IN 1.2.0 (PORT 1.5.6)
   was for a 2002 website and is skipped.
 - Vegeta's Namek saga (HUB > Gateway, Budokai 1) is read: who speaks and
   what they say, the fight card ("Vegeta versus Zarbon") and Retry or
-  Quit after a loss. It needs Zarbon imported from your Budokai 1 disc
-  with the port's Mod Kit (Import character > Budokai 1); until then the
-  row says "unavailable" and what to do.
+  Quit after a loss. It needs Zarbon from Budokai 1. The Zarbon from
+  Nova's Mods (installed in the port's launcher) is that same Budokai 1
+  port, and "Play Budokai 3 Access.exe" marks him (and Dodoria) the way
+  the saga expects, so no Mod Kit import is needed. The Mod Kit import
+  would also need a Budokai 3 PS2 disc, and the Kit and the port's
+  launcher can't be used with a screen reader. Without Zarbon the row
+  says "unavailable".
 
 Known limits in 1.2.0:
 - Port bug: on Dragon Tactics' start menu, A (Space on the keyboard) often

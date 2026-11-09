@@ -296,6 +296,48 @@ static void english_check(void) {
     logw(L"set dbz3_language = 1 (English)");
 }
 
+/* Port 1.5.6's Gateway saga from Budokai 1 wants Zarbon (and Dodoria) imported
+ * from the player's Budokai 1 disc: it looks for origen_fuente = "b1",
+ * origen_clave = "13" / "14" in the fighter's personaje.toml. The Mod Kit import
+ * also needs a Budokai 3 PS2 disc, and neither the Kit nor the port's launcher
+ * can be used with a screen reader. Nova's Mods' Zarbon and Dodoria are the same
+ * Budokai 1 ports (gritos = "b1:13" / "b1:14") without that tag, so it is added. */
+static void tag_b1_ports(void) {
+    wchar_t pat[MAX_PATH];
+    swprintf(pat, MAX_PATH, L"%lsmods\\*", g_dir);
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == L'.' || fd.cFileName[0] == L'_') continue;
+        wchar_t path[MAX_PATH];
+        swprintf(path, MAX_PATH, L"%lsmods\\%ls\\personaje.toml", g_dir, fd.cFileName);
+        FILE *f = _wfopen(path, L"rb");
+        if (!f) continue;
+        static char buf[65536];
+        size_t n = fread(buf, 1, sizeof buf - 1, f);
+        int whole = feof(f);
+        fclose(f);
+        buf[n] = 0;
+        if (!whole || strstr(buf, "origen_fuente")) continue;
+        const char *key = strstr(buf, "gritos = \"b1:13\"") ? "13" : strstr(buf, "gritos = \"b1:14\"") ? "14" : NULL;
+        char *head = strstr(buf, "[personaje]");
+        if (!key || !head) continue;
+        char *eol = strchr(head, '\n');
+        if (!eol) continue;
+        eol++;
+        const char *nl = (eol - 2 >= buf && eol[-2] == '\r') ? "\r\n" : "\n";
+        f = _wfopen(path, L"wb");
+        if (!f) continue;
+        fwrite(buf, 1, (size_t)(eol - buf), f);
+        fprintf(f, "origen_fuente = \"b1\"%sorigen_clave = \"%s\"%s", nl, key, nl);
+        fwrite(eol, 1, n - (size_t)(eol - buf), f);
+        fclose(f);
+        logw(L"marked mods\\%ls as the Budokai 1 import the port's Namek saga asks for", fd.cFileName);
+    } while (FindNextFileW(h, &fd));
+    FindClose(h);
+}
+
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     (void)inst; (void)prev; (void)show;
     GetModuleFileNameW(NULL, g_dir, MAX_PATH);
@@ -315,6 +357,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     int ok = plugins ? repair_plugin() : repair();
     port_settings();
     controller_backend();
+    tag_b1_ports();
     if (repair_only) return ok ? 0 : 1;
     english_check();
     skip_launcher();
