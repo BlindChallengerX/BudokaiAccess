@@ -15,6 +15,7 @@ windres src/rexmod.rc -O coff -o out/rexmod_res.o
 windres src/core.rc -O coff -o out/core_res.o
 windres src/launch.rc -O coff -o out/launch_res.o
 gcc -O2 -Wall -s -mwindows -municode -o "out/Play Budokai 3 Access.exe" src/launch.c out/launch_res.o -lversion -static-libgcc
+gcc -O2 -Wall -Wno-format-truncation -s -municode -o "out/Budokai 3 Access Mods.exe" src/novamods.c -lwinhttp -lbcrypt -static-libgcc
 gcc -O2 -Wall -shared -s -o out/rexgpu-access.dll src/plugin.c src/plugin.def out/plugin_res.o -static-libgcc
 mkdir -p out/plugins
 gcc -O2 -Wall -shared -s -DREX_MOD_PLUGIN -o out/plugins/Budokai3Access.dll src/plugin.c out/rexmod_res.o -static-libgcc

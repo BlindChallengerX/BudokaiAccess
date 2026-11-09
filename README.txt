@@ -102,12 +102,12 @@ NEW IN 1.2.0 (PORT 1.5.6)
   was for a 2002 website and is skipped.
 - Vegeta's Namek saga (HUB > Gateway, Budokai 1) is read: who speaks and
   what they say, the fight card ("Vegeta versus Zarbon") and Retry or
-  Quit after a loss. It needs Zarbon from Budokai 1. The Zarbon from
-  Nova's Mods (installed in the port's launcher) is that same Budokai 1
-  port, and "Play Budokai 3 Access.exe" marks him (and Dodoria) the way
-  the saga expects, so no Mod Kit import is needed. The Mod Kit import
-  would also need a Budokai 3 PS2 disc, and the Kit and the port's
-  launcher can't be used with a screen reader. Without Zarbon the row
+  Quit after a loss. It needs Zarbon from Budokai 1. Install Zarbon from
+  Nova's Mods with "Budokai 3 Access Mods.exe" (see NOVA'S MODS below):
+  he is that same Budokai 1 port, and "Play Budokai 3 Access.exe" marks
+  him (and Dodoria) the way the saga expects, so no Mod Kit import is
+  needed. (The Mod Kit import would also need a Budokai 3 PS2 disc, and
+  the Kit can't be used with a screen reader.) Without Zarbon the row
   says "unavailable".
 
 Known limits in 1.2.0:
@@ -265,11 +265,30 @@ the game and screen readers see an empty window (Tab moves around it, but
 nothing is spoken). So the first time you run "Play Budokai 3 Access.exe" it
 sets the game to skip the launcher and start straight away.
 
-With this nightly the mod also runs in the launcher and reads out each tab
-as it opens, all at once rather than as you move. You need the launcher for
-Nova's Mods (extra fighters) and for picking your PS2 discs (Game tab, "Pick
-ISO", which opens a normal Windows file box). It is still easiest with
-sighted help.
+From port 1.5.6 the mod starts only when the game itself starts, so it
+can't read the launcher. You don't need it: Nova's Mods are installed with
+"Budokai 3 Access Mods.exe" (below), and a PS2 disc can be picked inside the
+Gateway (A on a mode that asks for it opens a normal Windows file box, which
+the mod brings to the front) or linked by hand, see the Budokai 2 notes.
+
+
+NOVA'S MODS (EXTRA FIGHTERS, COSTUMES, STORIES)
+
+"Budokai 3 Access Mods.exe" in the game folder installs the port's official
+extra content (Zarbon, Dodoria, Android 19, Janemba, the Ginyu Force, Goku
+Black, costumes, Frieza's Story, the HD texture packs) in a plain console
+window your screen reader reads. Close the game first.
+
+It lists every mod with a number, its kind and whether it is installed
+("installed, update available", "not installed"). Type a number and press
+Enter: it reads the mod's description and size; then I installs or updates
+it, R removes it, Enter alone goes back. Enter alone on the list finishes.
+It downloads from the same place as the port's launcher, with the key that
+comes with the port (novas_mods.key), checks the file, and keeps any copy it
+replaces or removes in the mods_respaldo folder (nothing is deleted). When
+you finish it updates the game's character list, which the port's launcher
+would do when you press PLAY. Then start the game with "Play Budokai 3
+Access.exe" as usual.
 
 You can change the settings in the file dbz3_user.toml in the game folder
 instead. Close the game, open the file in Notepad, change or add a line and
