@@ -110,7 +110,7 @@ Known limits in 1.2.0:
 - Port bug: on Dragon Tactics' start menu, A (Space on the keyboard) often
   does nothing. The press also ends the port's camera scene behind the
   menu, and the menu misses it. Options usually opens; Play and How to
-  play mostly don't. Reported to the port's developer.
+  play mostly don't.
 - More than 24 extra fighters puts the wheel into pages: LB and RB say
   "Characters 2/2" and then the fighter under the cursor. The page's
   fighters take turns in the same spots on the wheel, and the mod names
