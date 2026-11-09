@@ -131,7 +131,14 @@ int roster_page(void);
 uint16_t pad_ui_take_edges(void);   /* port-screen buttons pressed since last call */
 const char *ship_char_name(int id, char *buf, size_t cap);
 void ship_poll(void);
-int ship_busy(void);      /* in Babidi's ship or the Budokai 2 main menu */      /* Babidi's Spaceship (ship.c) */    /* wheel page on screen (0 = first) */   /* Dragon Tactics open: no fight readers */
+void hercule_line(const char *line, int silent);   /* Legend of Hercule (hercule.c) */
+void hercule_poll(void);
+int im_b1_dif(void);       /* Hercule difficulty board: chosen row, or -1 */
+int hercule_busy(void);
+int hercule_scene(void);
+int hercule_skip_text(const char *s);   /* the ending's password, drawn in symbols */   /* a Legend of Hercule cut-scene (a hidden fight) is playing */
+int ship_busy(void);
+int port_menu_skipped(void);   /* the port just said it skips the after-match menu (its own mode screen follows) */      /* in Babidi's ship or the Budokai 2 main menu */      /* Babidi's Spaceship (ship.c) */    /* wheel page on screen (0 = first) */   /* Dragon Tactics open: no fight readers */
 const char *im_find(const char *prefix);
 void im_dialog_poll(void);   /* the port's ISO file dialog: bring it forward */
 int im_read_all(int interrupt);

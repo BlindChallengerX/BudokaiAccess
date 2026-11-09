@@ -19,7 +19,7 @@ gcc -O2 -Wall -shared -s -o out/rexgpu-access.dll src/plugin.c src/plugin.def ou
 mkdir -p out/plugins
 gcc -O2 -Wall -shared -s -DREX_MOD_PLUGIN -o out/plugins/Budokai3Access.dll src/plugin.c out/rexmod_res.o -static-libgcc
 gcc -O2 -Wall -Wno-unused-function -shared -o out/Budokai3Access/Budokai3Access.dll \
-  src/dllmain.c src/speech.c src/buttons.c src/guest.c src/game.c src/pad.c src/text.c src/tasks.c src/menus.c src/fight.c src/du.c src/imgui.c src/roster.c src/ship.c src/health.c \
+  src/dllmain.c src/speech.c src/buttons.c src/guest.c src/game.c src/pad.c src/text.c src/tasks.c src/menus.c src/fight.c src/du.c src/imgui.c src/roster.c src/ship.c src/hercule.c src/health.c \
   $MH/src/hook.c $MH/src/buffer.c $MH/src/trampoline.c $MH/src/hde/hde64.c \
   out/core_res.o -I$MH/include -Ithird_party/prism -Isrc -static-libgcc -lole32 -luuid -lsapi -lwinmm -lversion
 echo built out/rexgpu-access.dll out/Budokai3Access/Budokai3Access.dll

@@ -83,6 +83,47 @@ static void __cdecl h_addrect(void *self, const ImVec2 *a, const ImVec2 *b, uint
     InterlockedDecrement(&g_inflight);
 }
 
+/* Pictures (ImDrawList::AddImage): only their centres, for screens drawn from
+ * disc pictures (the Legend of Hercule difficulty board). ImTextureRef is 16
+ * bytes, so it comes by pointer. */
+typedef struct { float x, y; } ImgAt;
+#define IMG_MAX 96
+static ImgAt g_img_build[IMG_MAX], g_img_done[IMG_MAX];
+static int g_nimg_build, g_nimg_done;
+static void *g_addimage_target;
+static void (__cdecl *o_addimage)(void *, void *, const ImVec2 *, const ImVec2 *, const ImVec2 *, const ImVec2 *, uint32_t);
+static void __cdecl h_addimage(void *self, void *tex, const ImVec2 *a, const ImVec2 *b, const ImVec2 *ua, const ImVec2 *ub, uint32_t col) {
+    InterlockedIncrement(&g_inflight);
+    if (a && b && g_nimg_build < IMG_MAX) {
+        ImgAt *m = &g_img_build[g_nimg_build++];
+        m->x = (a->x + b->x) * 0.5f; m->y = (a->y + b->y) * 0.5f;
+    }
+    o_addimage(self, tex, a, b, ua, ub, col);
+    InterlockedDecrement(&g_inflight);
+}
+
+/* Legend of Hercule difficulty board (pasarela.cpp): the three options are drawn
+ * one after another, centred on one x, a row apart, the chosen one last.
+ * Returns its row (0 top) in the last frame, or -1. */
+int im_b1_dif(void) {
+    if (!g_ready || !g_addimage_target) return -1;
+    ImgAt m[IMG_MAX];
+    EnterCriticalSection(&g_lock);
+    int n = g_nimg_done;
+    memcpy(m, g_img_done, sizeof(ImgAt) * (size_t)n);
+    LeaveCriticalSection(&g_lock);
+    int found = -1;
+    for (int i = 0; i + 2 < n; i++) {
+        if (fabsf(m[i].x - m[i + 1].x) > 3 || fabsf(m[i].x - m[i + 2].x) > 3) continue;
+        float y0 = m[i].y, y1 = m[i + 1].y, y2 = m[i + 2].y;
+        float lo = fminf(y0, fminf(y1, y2)), hi = fmaxf(y0, fmaxf(y1, y2)), mid = y0 + y1 + y2 - lo - hi;
+        float g1 = mid - lo, g2 = hi - mid;
+        if (g1 < 10 || g2 < 10 || fabsf(g1 - g2) > 0.25f * g1) continue;
+        found = y2 == lo ? 0 : y2 == hi ? 2 : 1;
+    }
+    return found;
+}
+
 static void __cdecl h_newframe(void) {
     InterlockedIncrement(&g_inflight);
     EnterCriticalSection(&g_lock);
@@ -91,6 +132,9 @@ static void __cdecl h_newframe(void) {
     memcpy(g_hl_done, g_hl_build, sizeof(HlRect) * (size_t)g_nhl_build);
     g_nhl_done = g_nhl_build;
     g_nhl_build = 0;
+    memcpy(g_img_done, g_img_build, sizeof(ImgAt) * (size_t)g_nimg_build);
+    g_nimg_done = g_nimg_build;
+    g_nimg_build = 0;
     InterlockedIncrement(&g_frame_no);
     LeaveCriticalSection(&g_lock);
     g_nbuild = 0;
@@ -132,6 +176,9 @@ void im_init(void) {
     MH_EnableHook(g_newframe_target);
     if (g_addrect_target && MH_CreateHook(g_addrect_target, (void *)h_addrect, (void **)&o_addrect) == MH_OK) MH_EnableHook(g_addrect_target);
     else g_addrect_target = NULL;
+    g_addimage_target = (void *)GetProcAddress(rt, "?AddImage@ImDrawList@@QEAAXUImTextureRef@@AEBUImVec2@@111I@Z");
+    if (g_addimage_target && MH_CreateHook(g_addimage_target, (void *)h_addimage, (void **)&o_addimage) == MH_OK) MH_EnableHook(g_addimage_target);
+    else g_addimage_target = NULL;
     g_ready = 1;
     log_line("imgui: text hooks on");
 }
@@ -144,6 +191,7 @@ void im_shutdown(void) {
     MH_RemoveHook(g_addtext_target);
     MH_RemoveHook(g_newframe_target);
     if (g_addrect_target) { MH_DisableHook(g_addrect_target); MH_RemoveHook(g_addrect_target); }
+    if (g_addimage_target) { MH_DisableHook(g_addimage_target); MH_RemoveHook(g_addimage_target); }
 }
 
 /* imdump: log every text of the last frame with position and colour. */
@@ -279,6 +327,7 @@ static const struct { const char *start, *name, *also; } k_rows[] = {
     { "Stories and missions from Budokai 2", "Gateway" },
     /* Gateway's Budokai 1 and 2 rows start the same way; only the HUB's says "and pick" */
     { "Needs your copy of Dragon Ball Z Budokai", "Legend of Hercule, not available", "Press A and pick its ISO" },
+    { "Mr. Satan's story at the Cell Games", "Legend of Hercule" },   /* HUB row, Budokai 1 disc found */
     { "A hundred missions by saga", "Mission 100" },
     { "Your own hero and story", "Hero Mode" },
     { "Auto chess with the Budokai 3 fighters", "Dragon Tactics" },   /* 1.5.6 */
@@ -584,7 +633,7 @@ void im_poll(void) {
             }
             char *dash = strstr(say, "- - -");             /* ONLINE's empty room code */
             if (dash) snprintf(dash, sizeof say - (size_t)(dash - say), "empty");
-            if (g_im_mute) continue;
+            if (g_im_mute || hercule_skip_text(say)) continue;
             const char *off = l[k].off ? ", unavailable" : "";
             /* ONLINE's progress list: "1 HOST OR JOIN" ... "4 FIGHT" */
             int step = say[0] >= '1' && say[0] <= '9' && say[1] == ' ' && say[0] - '0' == pos + 1;
@@ -633,7 +682,7 @@ void im_poll(void) {
         int para = g_iv[ready[a]].para;
         buf[0] = 0;
         for (; a < nr && g_iv[ready[a]].para == para; a++) {
-            if (tail_quiet(g_iv[ready[a]].s)) continue;
+            if (tail_quiet(g_iv[ready[a]].s) || hercule_skip_text(g_iv[ready[a]].s)) continue;
             if (buf[0] && strlen(buf) + 1 < sizeof buf) strcat(buf, " ");
             strncat(buf, g_iv[ready[a]].s, sizeof buf - strlen(buf) - 1);
         }

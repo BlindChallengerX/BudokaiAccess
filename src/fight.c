@@ -196,7 +196,7 @@ void fight_poll(void) {
     int active = battle && geometry(&d, &s, &dy);
     EnterCriticalSection(&g_lock);
     s_active = active;
-    s_quiet = !s_round || im_tactics_on() || task_running("[FIX]PSDRW") || s_ult_on || task_running("[FIX]DRUSH")
+    s_quiet = !s_round || im_tactics_on() || hercule_scene() || task_running("[FIX]PSDRW") || s_ult_on || task_running("[FIX]DRUSH")
               || task_running("[PLY] SCR INPUT") || task_running("HM CHARGE LINE")   /* scripted rush scenes, Hyper Mode dash */
               || task_running("[FIX]ULT") || task_running("[FIX]ULT DRAW");   /* the whole Ultimate, not just the presses */
     if (active) { s_dist = d; s_side = s; s_dy = dy; s_update = GetTickCount(); }
@@ -662,7 +662,7 @@ static const char *const k_round_end[] = {
 static void announce_poll(void) {
     for (unsigned i = 0; i < sizeof k_msgs / sizeof k_msgs[0]; i++) {
         int on = task_running(k_msgs[i].task);
-        if (on && !g_msg_seen[i] && !im_tactics_on()) {   /* Dragon Tactics' hidden fight says nothing */
+        if (on && !g_msg_seen[i] && !im_tactics_on() && !hercule_scene()) {   /* Dragon Tactics' and Hercule's scene fights say nothing */
             /* "... 1P" / "... 2P" messages are about a side; the texts are
              * written for you being player 1, so take the partner's when
              * you are player 2 (the pairs sit next to each other). */

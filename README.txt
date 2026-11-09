@@ -87,6 +87,25 @@ NEW IN 1.2.0 (PORT 1.5.6)
   and the prize cards' text are pictures and are not read.
 - The Dragon World board itself (Budokai 2's board game) is not read yet.
 
+- Legend of Hercule (HUB, needs your Budokai 1 disc in the port's
+  ps2_games folder) is read from start to end: the title ("Press START"),
+  the difficulty board (Novice, Adept, Advanced: up and down), and before
+  each challenger from the 2nd, Hercule's talk from the disc, what he
+  thinks, the rule of the next fight and your points ("Challenger 3 of 11:
+  Krillin. Hercule: ... Fight Krillin without recovering Health!"). Then
+  the fight ("2nd challenger: Hercule versus Tien"; the five Cell Jrs. are
+  "1 of 5" to "5 of 5"), the points after a win ("You won! 1499 points
+  this challenger. Total 1499."), "Hercule is down! A to retry, B to quit"
+  after a loss, and the ending's total. The cut-scenes' subtitles are
+  read; fight calls (Ready, Fight, Ring out) stay quiet during the
+  scenes, which the port plays as hidden fights. The password at the end
+  was for a 2002 website and is skipped.
+- Vegeta's Namek saga (HUB > Gateway, Budokai 1) is read: who speaks and
+  what they say, the fight card ("Vegeta versus Zarbon") and Retry or
+  Quit after a loss. It needs Zarbon imported from your Budokai 1 disc
+  with the port's Mod Kit (Import character > Budokai 1); until then the
+  row says "unavailable" and what to do.
+
 Known limits in 1.2.0:
 - Port bug: on Dragon Tactics' start menu, A (Space on the keyboard) often
   does nothing. The press also ends the port's camera scene behind the
@@ -147,8 +166,7 @@ Known limits:
 - The Budokai 2 board and the Infinite World map open and their menus
   read, but the board itself is not read yet, so they can't be played by
   ear.
-- Babidi's Spaceship is not read yet: its screens are pictures from your
-  Budokai 2 disc. With the USA disc the port also can't load the ship's
+- With the USA Budokai 2 disc the port can't load the ship's
   and the Budokai 2 board's graphics (it looks for DATA_UK.AFS, the USA
   disc has DATA_US.AFS). Workaround: extract the disc's files (7-Zip
   opens the ISO) into a folder named "Budokai 2" inside the game's
@@ -158,6 +176,13 @@ Known limits:
   padding and can be left out.
 - Some of the new fighters still play and sound rough; that's the port's
   work in progress.
+- Port bug with the USA Budokai 1 disc: the port looks for the European
+  file names (USR\DATA_EN.AFS and USR\ADX_JP.AFS; the USA disc has
+  DATA_US.AFS and ADX_US.AFS). Legend of Hercule still plays and the mod
+  reads all of it, but the port shows its own plain screens in place of
+  the disc's pictures, a shorter round 1 scene, and no Budokai 1 voices or
+  music. Renaming the files is not a fix for the sound: the USA audio file
+  is numbered differently, so the port would play the wrong clips.
 - Port bug with the USA disc: the stages from your PS2 Budokai 2 and
   Infinite World discs are not built, because the port looks for
   us\data_eng.afs, a file only the European disc has. Until the port is

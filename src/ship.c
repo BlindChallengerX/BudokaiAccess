@@ -87,6 +87,7 @@ static HANDLE g_log = INVALID_HANDLE_VALUE;
 static wchar_t g_log_name[MAX_PATH];
 static char g_part[1024];
 static size_t g_npart;
+static DWORD g_skip_at;                           /* "dbz3 modos: sin menu final": the port skips the after-match menu */
 
 static long prog_int(const char *key, long def) {
     wchar_t path[MAX_PATH];
@@ -346,6 +347,7 @@ static void open_log(void) {
         for (char *ln = buf, *nl; ln && *ln; ln = nl ? nl + 1 : NULL) {
             nl = strchr(ln, '\n'); if (nl) *nl = 0;
             if (strstr(ln, "dbz3 nave: ") || strstr(ln, "dbz3 misiones: ")) handle(ln);
+            else if (strstr(ln, "dbz3 pasarela: ")) hercule_line(ln, 1);
         }
         g_silent = 0;
         free(buf);
@@ -355,6 +357,7 @@ static void open_log(void) {
 }
 
 int ship_busy(void) { return g_active || g_b2menu > 0; }
+int port_menu_skipped(void) { return g_skip_at && GetTickCount() - g_skip_at < 4000; }
 
 void ship_poll(void) {
     static DWORD last_open;
@@ -363,6 +366,7 @@ void ship_poll(void) {
     uint16_t e = pad_ui_take_edges();
     if (e & 0x800f) g_last_dir = e & 0x800f;
     else if (e) g_last_dir = 0;
+    hercule_poll();
     /* the ship has no highlighted ImGui rows; one of the port's menus being up means we left it */
     /* (the Gateway list stays up for a moment as the ship opens) */
     if ((g_active || g_b2menu > 0) && im_menu_on() && now - g_enter_at > 4000) { g_active = 0; g_b2menu = -1; g_scr = S_NONE; log_line("ship: left"); }
@@ -375,6 +379,8 @@ void ship_poll(void) {
             if (ch == '\n') {
                 g_part[g_npart] = 0;
                 if (strstr(g_part, "dbz3 nave: ") || strstr(g_part, "dbz3 misiones: ")) handle(g_part);
+                else if (strstr(g_part, "dbz3 pasarela: ")) hercule_line(g_part, 0);
+                else if (strstr(g_part, "dbz3 modos: sin menu final")) g_skip_at = GetTickCount();
                 g_npart = 0;
             } else if (ch != '\r' && g_npart < sizeof g_part - 1) g_part[g_npart++] = ch;
         }

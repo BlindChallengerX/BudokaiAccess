@@ -190,7 +190,7 @@ static void layout_poll(uint32_t w) {
         if (layout_on_screen(l) && (best < 0 || layout_len(l) > layout_len(best))) best = l;
     if (best != g_layout) { g_layout = best; g_lay_row = -1; }
     if (g_layout < 0) return;
-    if (g_layout == 1 && ship_busy()) { text_mute_pack(PAUSE_TEXTS); return; }   /* Babidi's ship skips the after-match menu on its own */
+    if (g_layout == 1 && (ship_busy() || hercule_busy() || port_menu_skipped())) { text_mute_pack(PAUSE_TEXTS); return; }   /* the port's modes skip the after-match menu on their own */
     int n = layout_len(g_layout);
     int row = g8(w + 9);
     if (row < 0 || row >= n || row == g_lay_row) return;
@@ -899,7 +899,8 @@ static void trl_poll(void) {
 
 void menus_poll(void) {
     /* Babidi's ship runs over the main menu, which shows for a moment after each fight */
-    if (ship_busy()) { for (int i = 0; i < NMENUS; i++) k_menus[i].last = -1; return; }
+    /* so does the Legend of Hercule, between its scenes and fights */
+    if (ship_busy() || hercule_busy()) { for (int i = 0; i < NMENUS; i++) k_menus[i].last = -1; return; }
     for (int i = 0; i < NMENUS; i++) {
         Menu *m = &k_menus[i];
         uint32_t w = menu_base(m);
