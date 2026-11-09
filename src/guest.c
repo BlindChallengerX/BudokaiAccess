@@ -61,11 +61,29 @@ void *guest_host_fn(uint32_t guest) {
     return ftable()[(guest - CODE_BASE) / 4];
 }
 
-int guest_ready(void) {
+uintptr_t g_guest_base = 0x100000000ULL;
+
+static int table_here(void) {
     uint32_t probe = FTABLE + (0x820deac8u - CODE_BASE) * 2;
     if (!guest_ok(FTABLE, 8) || !guest_ok(probe, 8) || !guest_ok(FTABLE + (CODE_END - CODE_BASE) * 2 - 8, 8)) return 0;
     /* The table is filled once the runtime has loaded the game module. */
     return ftable()[0] != NULL && ftable()[(0x820deac8u - CODE_BASE) / 4] != NULL;
+}
+
+/* The arena sits on a 4 GB boundary: 0x100000000 normally, higher when that
+ * range was taken when the port started. */
+int guest_ready(void) {
+    for (uintptr_t k = 1; k <= 16; k++) {
+        g_guest_base = k << 32;
+        memset((void *)g_okpages, 0, sizeof g_okpages);
+        if (table_here()) {
+            if (k != 1) log_line("guest memory at 0x%llx", (unsigned long long)g_guest_base);
+            return 1;
+        }
+    }
+    g_guest_base = 0x100000000ULL;
+    memset((void *)g_okpages, 0, sizeof g_okpages);
+    return 0;
 }
 
 /* host address -> guest function, for logs */

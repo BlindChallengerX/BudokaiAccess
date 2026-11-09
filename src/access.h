@@ -36,12 +36,14 @@ void speech_stop(void);
 
 /* guest.c: the Xbox 360 memory and the recompiled game code.
  *
- * The port maps guest memory at a fixed host address (logged by the game as
- * "Guest memory arena mapped: virtual base 0x100000000"). Guest data is
+ * The port maps guest memory at a host address it logs as "Guest memory
+ * arena mapped: virtual base 0x100000000". Usually that one, but when the
+ * address is taken it moves up (0x200000000 seen on a fresh install), so
+ * guest_ready() looks for it. Guest data is
  * big-endian. Recompiled functions are looked up through the table the
  * runtime keeps right after the image: 8-byte host pointers indexed by
  * (guest address - CODE_BASE) / 4. */
-#define GUEST_BASE   0x100000000ULL
+extern uintptr_t g_guest_base;   /* found by guest_ready() */
 #define CODE_BASE    0x82080000u
 #define CODE_END     0x8230EC00u
 #define FTABLE       0x826D0000u
@@ -55,7 +57,7 @@ typedef struct {
 } PPCContext;
 typedef void (*guest_fn)(PPCContext *ctx, uint8_t *base);
 
-static inline uint8_t *gptr(uint32_t a) { return (uint8_t *)(GUEST_BASE + a + (a >= 0xE0000000u ? 0x1000 : 0)); }
+static inline uint8_t *gptr(uint32_t a) { return (uint8_t *)(g_guest_base + a + (a >= 0xE0000000u ? 0x1000 : 0)); }
 int  guest_ok(uint32_t a, uint32_t len);           /* readable? */
 uint32_t g32(uint32_t a);                           /* big-endian reads; 0 if unreadable */
 uint16_t g16(uint32_t a);

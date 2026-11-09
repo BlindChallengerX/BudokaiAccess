@@ -114,11 +114,9 @@ __declspec(dllexport) void rex_mod_init(const RexModHost *host) {
                  host->port_version ? host->port_version : "?", host->region ? host->region : "?",
                  (void *)host->guest_base);
         host->log("Budokai3Access", msg);
-        /* The mod reads US addresses at the fixed guest base 0x100000000. */
+        /* The mod reads US addresses; it finds the guest base itself (guest_ready). */
         if (host->region && strcmp(host->region, "us") != 0)
             host->log("Budokai3Access", "this is not the US game; the mod only knows US addresses and may not work");
-        if ((uintptr_t)host->guest_base != 0x100000000ULL)
-            host->log("Budokai3Access", "unexpected guest memory base; the mod's self check will switch it off if needed");
     }
     access_start();
 }
